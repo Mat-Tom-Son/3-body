@@ -1,0 +1,12 @@
+**
+!package.json
+!package-lock.json
+!server.mjs
+!Three-Body Problem.html
+!scripts/
+!scripts/build.mjs
+!src/
+!src/**
+!public/
+!public/**
+!Dockerfile

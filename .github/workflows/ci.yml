@@ -1,0 +1,30 @@
+name: Check game
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Build deployment image
+        run: docker build -t three-body:check .
+      - name: Check deployment image
+        run: |
+          docker run --detach --name three-body-check -p 127.0.0.1:3000:3000 -e PORT=3000 three-body:check
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/healthz
+          curl --fail --head http://127.0.0.1:3000/
+      - name: Clean up container
+        if: always()
+        run: docker rm -f three-body-check || true

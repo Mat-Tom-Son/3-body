@@ -1,0 +1,212 @@
+{
+  "tool": "sharp 0.35.4",
+  "webp": {
+    "quality": 82,
+    "alphaQuality": 100,
+    "effort": 6
+  },
+  "note": "Authorized crop, resample, and compression only. Original master PNGs are unchanged and are not required for builds or deployment.",
+  "assets": [
+    {
+      "name": "star-amber",
+      "source": "output/body-assets-v2/images/star-amber.png",
+      "sourceSha256": "1f578b096ff991e14f138187f590ae76b1cfc1e8b8f492749216d0b00662dc10",
+      "sourceBytes": 1101993,
+      "crop": {
+        "left": 156,
+        "top": 155,
+        "width": 942,
+        "height": 942
+      },
+      "file": "public/assets/bodies/star-amber.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 14872,
+      "sha256": "5073002bd61199d23dfb57af507832fb6a0c9de8c6ac5c5718df692376e1e4aa"
+    },
+    {
+      "name": "star-cyan",
+      "source": "output/body-assets-v2/images/star-cyan.png",
+      "sourceSha256": "7988fbb2b05c9afb8d211aad6e45b556b87f2316f3dd809549ce086d594c7eb8",
+      "sourceBytes": 885003,
+      "crop": {
+        "left": 152,
+        "top": 153,
+        "width": 949,
+        "height": 949
+      },
+      "file": "public/assets/bodies/star-cyan.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 9480,
+      "sha256": "779dabb4010d036614424e0a968c9ebef7af154d7d6b139c9d16911e5b4825c9"
+    },
+    {
+      "name": "star-coral",
+      "source": "output/body-assets-v2/images/star-coral.png",
+      "sourceSha256": "10c397e0817ba20c0c4a01f86d516b9b0f9884faf85b5573dc37a44ec4d8d97b",
+      "sourceBytes": 1034875,
+      "crop": {
+        "left": 152,
+        "top": 152,
+        "width": 948,
+        "height": 948
+      },
+      "file": "public/assets/bodies/star-coral.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 11312,
+      "sha256": "55aea773f0348522ad623476382d2502cf4b8617d821b6f64f3e54bc1c10fd69"
+    },
+    {
+      "name": "planet-frozen",
+      "source": "output/body-assets-v2/images/planet-frozen.png",
+      "sourceSha256": "88a0050c962b9162d3ffab21bf622c79ebb74dfed40b55502fa3420d39bfcd3e",
+      "sourceBytes": 2038026,
+      "crop": {
+        "left": 88,
+        "top": 94,
+        "width": 1080,
+        "height": 1080
+      },
+      "file": "public/assets/bodies/planet-frozen.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 21758,
+      "sha256": "1f26d465e8b9128c1a04c7f7b2a794f29096c5dacae6c6813c1d777426acc47b"
+    },
+    {
+      "name": "planet-temperate",
+      "source": "output/body-assets-v2/images/planet-temperate.png",
+      "sourceSha256": "121d8b5612f94850bd2f5dc0b0f219eaec276a76e48c7cb7e883a12c293a7ea2",
+      "sourceBytes": 2044059,
+      "crop": {
+        "left": 88,
+        "top": 94,
+        "width": 1080,
+        "height": 1080
+      },
+      "file": "public/assets/bodies/planet-temperate.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 23074,
+      "sha256": "4798ebcfc7e5eae9094520fb78ef8f71467e6bd384fe4635c64c182994056b5c"
+    },
+    {
+      "name": "planet-hot",
+      "source": "output/body-assets-v2/images/planet-hot.png",
+      "sourceSha256": "4fa60bf246fc3f05f12b785ad31d176cec9336e5417409454927ed149fc55b92",
+      "sourceBytes": 1950040,
+      "crop": {
+        "left": 88,
+        "top": 94,
+        "width": 1080,
+        "height": 1080
+      },
+      "file": "public/assets/bodies/planet-hot.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 19856,
+      "sha256": "b157864c0d44a033632f2df763502c7a1672c2de87a39680437f79fd057ef4b4"
+    },
+    {
+      "name": "moon",
+      "source": "output/body-assets-v2/images/moon.png",
+      "sourceSha256": "d8b06c906add169d09943c912873bc10c35276dc101af0e714c741986b6c9ef8",
+      "sourceBytes": 1557631,
+      "crop": {
+        "left": 138,
+        "top": 139,
+        "width": 978,
+        "height": 978
+      },
+      "file": "public/assets/bodies/moon.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 12500,
+      "sha256": "adb84ea619a01d5d2a2a41b4da0765f443905e9811834a76fbc8f84dd216925e"
+    },
+    {
+      "name": "planet-thawing",
+      "source": "output/body-motion-v3/images/planet-thawing.png",
+      "sourceSha256": "b8cc79f7fdc504753699a3cae02f577fc193cee80ae314f514f4cd0d5be78511",
+      "sourceBytes": 2083596,
+      "crop": {
+        "left": 88,
+        "top": 94,
+        "width": 1080,
+        "height": 1080
+      },
+      "file": "public/assets/bodies/planet-thawing.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 23300,
+      "sha256": "ad5c15867ddb94e65f71955e5d242cd8e37099e98d59e11e8cbcb26274fe00fc"
+    },
+    {
+      "name": "planet-warming",
+      "source": "output/body-motion-v3/images/planet-warming.png",
+      "sourceSha256": "59985d4e5b9ba5731e8ab305c61a49b7d6b5c257613f42faa40d438e876c33a9",
+      "sourceBytes": 1905480,
+      "crop": {
+        "left": 88,
+        "top": 94,
+        "width": 1080,
+        "height": 1080
+      },
+      "file": "public/assets/bodies/planet-warming.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 21134,
+      "sha256": "cee9620b30f97f9d5e739c367bff5c9e2631f8a01a9eaedad9dbcfefadf3ceb2"
+    },
+    {
+      "name": "planet-stripped",
+      "source": "output/body-motion-v3/images/planet-stripped.png",
+      "sourceSha256": "a4a69499ecad7c1e9fa7cf36b3e3bcb7cc91e005296bf3188f703fe622cf8dec",
+      "sourceBytes": 1971011,
+      "crop": {
+        "left": 88,
+        "top": 94,
+        "width": 1080,
+        "height": 1080
+      },
+      "file": "public/assets/bodies/planet-stripped.webp",
+      "width": 256,
+      "height": 256,
+      "sizeBytes": 20760,
+      "sha256": "a61a6bd9f9d81ffafd8f21ea13ba1084925d7796dee48cf8da7945384d1a8b5a"
+    },
+    {
+      "name": "stellar-granulation",
+      "source": "output/body-motion-v3/images/stellar-granulation.png",
+      "sourceSha256": "87d0a38c03c1b745e29f8634f71ffc1f87aa2ea7dede8512c3ba59d7e768a543",
+      "sourceBytes": 2498278,
+      "crop": null,
+      "file": "public/assets/bodies/stellar-granulation.webp",
+      "width": 128,
+      "height": 128,
+      "sizeBytes": 5564,
+      "sha256": "62e0bf231f5be7de177b751eadeaaddcb146f1a9a9890ce83f8bff8010b6cd0a"
+    },
+    {
+      "name": "debris-fragment",
+      "source": "output/body-motion-v3/images/debris-fragment.png",
+      "sourceSha256": "82b9dee16e0905e21dc0f1616c59899d882fa63ec01745063fb6abba20ad941e",
+      "sourceBytes": 1117180,
+      "crop": {
+        "left": 224,
+        "top": 186,
+        "width": 818,
+        "height": 913
+      },
+      "file": "public/assets/bodies/debris-fragment.webp",
+      "width": 57,
+      "height": 64,
+      "sizeBytes": 2146,
+      "sha256": "9e0a73824197302d6660d4995e2894e457bdfc488e1fee20f1ded6e727721c2a"
+    }
+  ],
+  "totalSourceBytes": 20187172,
+  "totalBytes": 185756
+}
