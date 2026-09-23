@@ -546,6 +546,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
           <button type="button" role="radio" data-v="long" aria-checked="false">Long</button>
         </div>
       </div>
+      <button class="switch-row" type="button" role="switch" data-view="labels" aria-checked="false"><span>Body labels</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="arrows" aria-checked="false"><span>Velocity arrows while playing</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="slow" aria-checked="true"><span>Slow down for events</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="forecast" aria-checked="true"><span>Path ahead while paused</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
@@ -1267,7 +1268,7 @@ const restoreTrails = (m, s) => { m.clear(); for (const [id, snap] of s) trailFo
 /* ------------------------------------------------------------------ state */
 const ui = {
   speed: clamp(store.get('speed2', 0) | 0, 0, SPEEDS.length - 1),      // slow by default: the stories read better that way
-  view: Object.assign({ trails: 'short', arrows: false, forecast: true, com: false, grid: true, slow: true }, store.get('view', {})),
+  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true }, store.get('view', {})),
   tab: 'bodies',
   sheet: null,
 };
@@ -2225,15 +2226,17 @@ function drawBodies(paused) {
       }
       ctx.strokeStyle = inkA(theme.additive ? 0.55 : 0.35); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(d.x, d.y, d.r + 0.5, 0, 2 * Math.PI); ctx.stroke();
     }
-    if (isWorld(q) && !paused) { /* worlds carry no letter while playing: their look is the label */ }
-    else if (d.r >= 8 && !(bodyRenderer && isStar(q.m) && !isWorld(q))) {
-      ctx.fillStyle = theme.bodyInk; ctx.font = '600 ' + Math.min(13, d.r * (lab.length > 1 ? 0.8 : 1.05)).toFixed(1) + 'px ' + theme.fontUI; ctx.fillText(lab, d.x, d.y + 0.5);
-    } else {
-      let ux = -d.nx, uy = -d.ny; const L = Math.hypot(ux, uy);
-      if (L > 0 && d.nd < 60) { ux /= L; uy /= L; } else { ux = 0.7071; uy = -0.7071; }
-      const off = d.r + 10; ctx.font = '600 12px ' + theme.fontUI;
-      ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.lineJoin = 'round';
-      ctx.strokeText(lab, d.x + ux * off, d.y + uy * off); ctx.fillStyle = rgba(col, 1); ctx.fillText(lab, d.x + ux * off, d.y + uy * off);
+    if (ui.view.labels) {
+      if (isWorld(q) && !paused) { /* worlds carry no letter while playing: their look is the label */ }
+      else if (d.r >= 8 && !(bodyRenderer && isStar(q.m) && !isWorld(q))) {
+        ctx.fillStyle = theme.bodyInk; ctx.font = '600 ' + Math.min(13, d.r * (lab.length > 1 ? 0.8 : 1.05)).toFixed(1) + 'px ' + theme.fontUI; ctx.fillText(lab, d.x, d.y + 0.5);
+      } else {
+        let ux = -d.nx, uy = -d.ny; const L = Math.hypot(ux, uy);
+        if (L > 0 && d.nd < 60) { ux /= L; uy /= L; } else { ux = 0.7071; uy = -0.7071; }
+        const off = d.r + 10; ctx.font = '600 12px ' + theme.fontUI;
+        ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.lineJoin = 'round';
+        ctx.strokeText(lab, d.x + ux * off, d.y + uy * off); ctx.fillStyle = rgba(col, 1); ctx.fillText(lab, d.x + ux * off, d.y + uy * off);
+      }
     }
     if (paused) {
       const sel = q.id === world.sel;
@@ -2296,9 +2299,11 @@ function drawEdgeMarks() {                 // a body out of view leaves a marker
     const X = clamp(d.x, s.l + m, s.r - m), Y = clamp(d.y, s.t + m, s.b - m), a = Math.atan2(d.y - Y, d.x - X);
     ctx.fillStyle = rgba(colorOf(q), 1); ctx.beginPath();
     ctx.moveTo(X + 9 * Math.cos(a), Y + 9 * Math.sin(a)); ctx.lineTo(X + 6 * Math.cos(a + 2.3), Y + 6 * Math.sin(a + 2.3)); ctx.lineTo(X + 6 * Math.cos(a - 2.3), Y + 6 * Math.sin(a - 2.3)); ctx.closePath(); ctx.fill();
-    ctx.font = '600 12px ' + theme.fontUI;
-    const lx = X - 15 * Math.cos(a), ly = Y - 15 * Math.sin(a);
-    ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.strokeText(labelOf(q), lx, ly); ctx.fillText(labelOf(q), lx, ly);
+    if (ui.view.labels) {
+      ctx.font = '600 12px ' + theme.fontUI;
+      const lx = X - 15 * Math.cos(a), ly = Y - 15 * Math.sin(a);
+      ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.strokeText(labelOf(q), lx, ly); ctx.fillText(labelOf(q), lx, ly);
+    }
   }
 }
 function drawDragLabel() {

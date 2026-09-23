@@ -14,6 +14,8 @@ npm start
 
 Open [localhost:3000](http://localhost:3000). Set `PORT` to change the port. `npm run dev` rebuilds once and starts the same production server; rerun it after source changes.
 
+Body labels are off by default. Enable **Customize → View → Body labels** to show letters on the sky and offscreen markers; the choice is saved in your browser. The editor, accessible names, and history still use those identifiers to distinguish bodies.
+
 ## Build and assets
 
 Stars, planets, and moons have rotating spherical surfaces. Three generated surface maps supply terrain, lunar craters, and stellar granulation. Planet textures move continuously through frozen, thawing, temperate, drying, and hot states, driven by the existing temperature model; all states share the same geography and rotation. Tidal debris, moon formation, impacts, and stellar swallowing follow actual event body IDs and current positions. A damaged planet's scar rotates with its surface and preserves its climate. Labels, halos, and the existing night-side illumination remain separate from the rotating textures.
