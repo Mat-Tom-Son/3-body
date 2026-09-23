@@ -1,0 +1,44 @@
+{
+  "tool": "sharp 0.35.4",
+  "webp": {
+    "quality": 86,
+    "effort": 6
+  },
+  "note": "Resizing and compression of three generated 2:1 surface maps. Original masters remain unchanged; globe projection, climate, seam blending, and lighting are handled by the renderer.",
+  "assets": [
+    {
+      "name": "planet-surface",
+      "source": "output/body-rotation-v4/images/planet-surface.png",
+      "sourceSha256": "608485ac9f2832236162eb78ac9c710e06f0dc84d5eae051356ceb17123206b9",
+      "sourceBytes": 2537613,
+      "file": "public/assets/bodies/planet-surface.webp",
+      "width": 512,
+      "height": 256,
+      "sizeBytes": 40446,
+      "sha256": "5b44d720a4cb85213f55d756e562380273fa4d328e317c92fa3f19d25574fd99"
+    },
+    {
+      "name": "moon-surface",
+      "source": "output/body-rotation-v4/images/moon-surface.png",
+      "sourceSha256": "c2591d1638ffa600d5ab68815756d393cec8334a34e89289f1d09fe3a3cd61ef",
+      "sourceBytes": 2416753,
+      "file": "public/assets/bodies/moon-surface.webp",
+      "width": 512,
+      "height": 256,
+      "sizeBytes": 19642,
+      "sha256": "f31fc279393970268c892f6dde48ab72a5faaabe63b81ac91d3ebb6024fe34e7"
+    },
+    {
+      "name": "star-surface",
+      "source": "output/body-rotation-v4/images/star-surface.png",
+      "sourceSha256": "e55e1925266e0f4560f85c4749bf2ea7fa0243ff92ba6d3a5aa0f68e3420dbde",
+      "sourceBytes": 3045824,
+      "file": "public/assets/bodies/star-surface.webp",
+      "width": 512,
+      "height": 256,
+      "sizeBytes": 50354,
+      "sha256": "74a241b26c22d7f5371f8d4c6bd2a4ed8668e7661ad90929e58ffb63f5f86ba3"
+    }
+  ],
+  "totalBytes": 110442
+}

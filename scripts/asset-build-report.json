@@ -178,18 +178,6 @@
       "sha256": "a61a6bd9f9d81ffafd8f21ea13ba1084925d7796dee48cf8da7945384d1a8b5a"
     },
     {
-      "name": "stellar-granulation",
-      "source": "output/body-motion-v3/images/stellar-granulation.png",
-      "sourceSha256": "87d0a38c03c1b745e29f8634f71ffc1f87aa2ea7dede8512c3ba59d7e768a543",
-      "sourceBytes": 2498278,
-      "crop": null,
-      "file": "public/assets/bodies/stellar-granulation.webp",
-      "width": 128,
-      "height": 128,
-      "sizeBytes": 5564,
-      "sha256": "62e0bf231f5be7de177b751eadeaaddcb146f1a9a9890ce83f8bff8010b6cd0a"
-    },
-    {
       "name": "debris-fragment",
       "source": "output/body-motion-v3/images/debris-fragment.png",
       "sourceSha256": "82b9dee16e0905e21dc0f1616c59899d882fa63ec01745063fb6abba20ad941e",
@@ -207,6 +195,6 @@
       "sha256": "9e0a73824197302d6660d4995e2894e457bdfc488e1fee20f1ded6e727721c2a"
     }
   ],
-  "totalSourceBytes": 20187172,
-  "totalBytes": 185756
+  "totalSourceBytes": 17688894,
+  "totalBytes": 180192
 }

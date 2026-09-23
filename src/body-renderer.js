@@ -1,7 +1,8 @@
 /* BodyRenderer: optional Canvas 2D body art, with no simulation state or clock.
  * Both draw methods return false while the required sprite is unavailable, so
  * the caller can keep its existing colored circle. All ctx state is restored.
- * Stars use a 32-frame / 64 px looping atlas prepared in short idle batches.
+ * Surface maps are projected onto a sphere once, in short idle batches. Drawing
+ * blends cached frames; it never reads pixels or advances an independent clock.
  * World detail is an overlay: the caller draws its climate-colored disc first.
  */
 (() => {
@@ -9,19 +10,22 @@
   const scriptURL = document.currentScript && document.currentScript.src;
   const assetRoot = new URL('../assets/bodies/', scriptURL || new URL('src/body-renderer.js', location.href));
   const TAU = Math.PI * 2;
-  const FRAME_SIZE = 64, FRAME_COUNT = 32, ATLAS_COLUMNS = 8, LOOP_SECONDS = 12;
-  const MAP_SIZE = 128, WORLD_SIZE = 128, MOTION_STRENGTH = .55;
+  const FRAME_SIZE = 64, FRAME_COUNT = 64, ATLAS_COLUMNS = 8;
+  const MAP_WIDTH = 256, MAP_HEIGHT = 128, WORLD_SIZE = 128, MOTION_STRENGTH = .55;
+  const PERIODS = { planet: 24, moon: 56, amber: 48, cyan: 56, coral: 64 };
   const STAR = {
     amber: { rgb: [255, 203, 82], phase: .25 },
     cyan: { rgb: [143, 220, 255], phase: 2.30 },
     coral: { rgb: [255, 138, 107], phase: 4.65 }
   };
   const CLIMATES = ['planet-frozen', 'planet-thawing', 'planet-temperate', 'planet-warming', 'planet-hot'];
-  const ASSETS = ['star-amber', 'star-cyan', 'star-coral', ...CLIMATES, 'moon', 'planet-stripped', 'stellar-granulation'];
+  const ASSETS = ['star-amber', 'star-cyan', 'star-coral', ...CLIMATES, 'moon', 'planet-stripped',
+    'planet-surface', 'moon-surface', 'star-surface'];
   const images = Object.create(null), atlases = Object.create(null), blends = Object.create(null), wisps = Object.create(null);
-  const failures = [], loaded = new Set();
+  const failures = [], loaded = new Set(), rotationReady = { planet: false, moon: false, star: false };
+  const recentPhases = Object.create(null);
   let atlasFrames = 0, atlasReady = false, prepared = false, preparationMs = 0;
-  let granulation = null, scar = null, worldLayer = null, worldLayerKey = '';
+  let scar = null, worldLayer = null, worldLayerKey = '', atlasJobs = 0;
 
   const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
   const finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
@@ -47,29 +51,46 @@
     return context.getImageData(0, 0, size, size);
   }
 
-  function prepareMap() {
-    if (!images['stellar-granulation']) return false;
-    const pixels = readPixels(images['stellar-granulation'], MAP_SIZE).data;
-    granulation = new Float32Array(MAP_SIZE * MAP_SIZE);
-    let mean = 0, variance = 0;
-    for (let p = 0; p < granulation.length; p++) {
-      granulation[p] = (pixels[p * 4] * .2126 + pixels[p * 4 + 1] * .7152 + pixels[p * 4 + 2] * .0722) / 255;
-      mean += granulation[p];
+  function readMap(image, grayscale = false) {
+    const target = canvas(MAP_WIDTH, MAP_HEIGHT), context = target.getContext('2d', { willReadFrequently: true });
+    context.drawImage(image, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+    const pixels = context.getImageData(0, 0, MAP_WIDTH, MAP_HEIGHT).data;
+    // Meet both longitude edges at their mean. The short transition keeps an
+    // imperfect source seam from becoming a visible line during a full turn.
+    const seam = 12;
+    for (let y = 0; y < MAP_HEIGHT; y++) for (let x = 0; x < seam; x++) {
+      const a = (y * MAP_WIDTH + x) * 4, b = (y * MAP_WIDTH + MAP_WIDTH - 1 - x) * 4;
+      const weight = 1 - smooth(x / (seam - 1));
+      for (let c = 0; c < 3; c++) {
+        const mean = (pixels[a + c] + pixels[b + c]) * .5;
+        pixels[a + c] += (mean - pixels[a + c]) * weight;
+        pixels[b + c] += (mean - pixels[b + c]) * weight;
+      }
     }
-    mean /= granulation.length;
-    for (const value of granulation) variance += (value - mean) ** 2;
-    const gain = .19 / Math.max(.025, Math.sqrt(variance / granulation.length));
-    for (let p = 0; p < granulation.length; p++) granulation[p] = clamp(.5 + (granulation[p] - mean) * gain, 0, 1);
-    return true;
+    const poles = [0, 0];
+    for (let end = 0; end < 2; end++) for (let x = 0; x < MAP_WIDTH; x++) {
+      const p = ((end ? MAP_HEIGHT - 1 : 0) * MAP_WIDTH + x) * 4;
+      poles[end] += (pixels[p] * .2126 + pixels[p + 1] * .7152 + pixels[p + 2] * .0722) / MAP_WIDTH;
+    }
+    let mean = 0, variance = 0;
+    if (grayscale) {
+      for (let p = 0; p < pixels.length; p += 4) mean += pixels[p] * .2126 + pixels[p + 1] * .7152 + pixels[p + 2] * .0722;
+      mean /= MAP_WIDTH * MAP_HEIGHT;
+      for (let p = 0; p < pixels.length; p += 4) variance += (pixels[p] * .2126 + pixels[p + 1] * .7152 + pixels[p + 2] * .0722 - mean) ** 2;
+    }
+    return { pixels, poles, mean, gain: grayscale ? 34 / Math.max(8, Math.sqrt(variance / (MAP_WIDTH * MAP_HEIGHT))) : 1 };
   }
 
-  function sample(u, v) {
-    u = ((u % 2) + 2) % 2; v = ((v % 2) + 2) % 2;
-    if (u > 1) u = 2 - u; if (v > 1) v = 2 - v;
-    const xx = u * (MAP_SIZE - 1), yy = v * (MAP_SIZE - 1), x0 = Math.floor(xx), y0 = Math.floor(yy);
-    const x1 = Math.min(MAP_SIZE - 1, x0 + 1), y1 = Math.min(MAP_SIZE - 1, y0 + 1), fx = xx - x0, fy = yy - y0;
-    return (granulation[y0 * MAP_SIZE + x0] * (1 - fx) + granulation[y0 * MAP_SIZE + x1] * fx) * (1 - fy)
-      + (granulation[y1 * MAP_SIZE + x0] * (1 - fx) + granulation[y1 * MAP_SIZE + x1] * fx) * fy;
+  function sampleMap(map, u, v, result) {
+    const xx = ((u % 1) + 1) % 1 * MAP_WIDTH, yy = clamp(v, 0, 1) * (MAP_HEIGHT - 1);
+    const x0 = Math.floor(xx), x1 = (x0 + 1) % MAP_WIDTH, y0 = Math.floor(yy), y1 = Math.min(MAP_HEIGHT - 1, y0 + 1);
+    const fx = xx - x0, fy = yy - y0, pixels = map.pixels;
+    const pole = smooth((Math.abs(v - .5) - .42) / .08), poleValue = map.poles[v < .5 ? 0 : 1];
+    for (let c = 0; c < 3; c++) {
+      const top = pixels[(y0 * MAP_WIDTH + x0) * 4 + c] * (1 - fx) + pixels[(y0 * MAP_WIDTH + x1) * 4 + c] * fx;
+      const bottom = pixels[(y1 * MAP_WIDTH + x0) * 4 + c] * (1 - fx) + pixels[(y1 * MAP_WIDTH + x1) * 4 + c] * fx;
+      result[c] = (top * (1 - fy) + bottom * fy) * (1 - pole) + poleValue * pole;
+    }
   }
 
   function prepareScar() {
@@ -109,72 +130,123 @@
     }
   }
 
-  function createAtlasBuilder() {
-    const overlay = canvas(FRAME_SIZE, FRAME_SIZE), overlayContext = overlay.getContext('2d');
-    const pixels = overlayContext.createImageData(FRAME_SIZE, FRAME_SIZE), values = new Float32Array(FRAME_SIZE * FRAME_SIZE);
-    const mask = new Float32Array(values.length), u = new Float32Array(values.length), v = new Float32Array(values.length);
-    const nx = new Float32Array(values.length), ny = new Float32Array(values.length);
+  const PALETTES = [
+    [[178, 211, 220], [94, 134, 151], [226, 237, 237]],
+    [[62, 125, 140], [141, 173, 154], [213, 229, 220]],
+    [[33, 92, 110], [163, 180, 147], [221, 230, 218]],
+    [[79, 111, 104], [165, 148, 108], [226, 221, 194]],
+    [[204, 136, 80], [104, 79, 63], [232, 189, 144]]
+  ];
+
+  function createAtlasBuilder(maps) {
+    const target = canvas(FRAME_SIZE, FRAME_SIZE), context = target.getContext('2d');
+    const pixels = context.createImageData(FRAME_SIZE, FRAME_SIZE), surface = new Float32Array(3);
+    const geometry = [], tilt = 14 * Math.PI / 180;
     for (let y = 0; y < FRAME_SIZE; y++) for (let x = 0; x < FRAME_SIZE; x++) {
-      const p = y * FRAME_SIZE + x;
-      nx[p] = (x + .5) / FRAME_SIZE * 2 - 1; ny[p] = (y + .5) / FRAME_SIZE * 2 - 1;
-      const r2 = nx[p] ** 2 + ny[p] ** 2;
+      const nx = (x + .5) / FRAME_SIZE * 2 - 1, ny = (y + .5) / FRAME_SIZE * 2 - 1, r2 = nx * nx + ny * ny;
       if (r2 >= 1) continue;
-      u[p] = .5 + Math.asin(nx[p]) * .27; v[p] = .5 + Math.asin(ny[p]) * .27;
-      mask[p] = smooth((1 - Math.sqrt(r2)) / .13) * (.4 + .6 * Math.sqrt(1 - r2));
+      const z = Math.sqrt(1 - r2), sx = nx * Math.cos(tilt) + ny * Math.sin(tilt), sy = -nx * Math.sin(tilt) + ny * Math.cos(tilt);
+      geometry.push({ p: (y * FRAME_SIZE + x) * 4, u: .5 + Math.atan2(sx, z) / TAU,
+        v: .5 + Math.asin(clamp(sy, -1, 1)) / Math.PI, alpha: smooth((1 - Math.sqrt(r2)) / .035), z, nx, ny });
     }
-    return (id, frame) => {
-      const phase = TAU * frame / FRAME_COUNT + STAR[id].phase, target = atlases[id], context = target.getContext('2d');
-      let mean = 0, weight = 0;
-      for (let p = 0; p < values.length; p++) {
-        if (!mask[p]) continue;
-        // Every time term is periodic, so the last frame blends into the first.
-        const flowU = .075 * Math.sin(phase + v[p] * 5) + .022 * Math.sin(2 * phase + u[p] * 3);
-        const flowV = .050 * Math.cos(phase + u[p] * 4) + .020 * Math.sin(2 * phase - v[p] * 3);
-        const a = sample(u[p] + flowU, v[p] + flowV);
-        const b = sample(u[p] * .82 + .11 * Math.cos(phase + 1.2) + .45, v[p] * .85 + .09 * Math.sin(phase) + .22);
-        const mix = .5 + .22 * Math.sin(phase + nx[p] * 3 - ny[p] * 2);
-        const broad = .5 + .5 * Math.sin(nx[p] * 7 + phase) * Math.cos(ny[p] * 5 - phase);
-        values[p] = (a * (1 - mix) + b * mix) * .82 + broad * .18;
-        mean += values[p] * mask[p]; weight += mask[p];
+    return (name, frame) => {
+      pixels.data.fill(0);
+      const phase = frame / FRAME_COUNT, star = name === 'star', moon = name === 'moon', scarred = name === 'scar';
+      const map = maps[star ? 'star' : moon ? 'moon' : 'planet'];
+      const palette = !star && !moon && !scarred ? PALETTES[Number(name.slice(-1))] : null;
+      let starMean = 0, starWeight = 0;
+      for (const g of geometry) {
+        const u = ((g.u + phase) % 1 + 1) % 1, p = g.p;
+        if (scarred) {
+          // A surface-space fracture shares the exact geography, projection,
+          // and phase of every climate frame. It rolls behind the limb too.
+          const du = ((u - .66 + 1.5) % 1) - .5, dv = g.v - .35;
+          const crack = du - .013 * Math.sin(dv * 55) - .007 * Math.sin(dv * 112);
+          const extent = smooth((dv + .14) / .035) * smooth((.18 - dv) / .05);
+          const rough = Math.exp(-(du * du / .003 + dv * dv / .014)) * .14;
+          pixels.data[p] = 13; pixels.data[p + 1] = 22; pixels.data[p + 2] = 25;
+          pixels.data[p + 3] = Math.round((Math.exp(-((crack / .010) ** 2)) * .38 * extent + rough) * g.alpha * 255);
+          continue;
+        }
+        sampleMap(map, u, g.v, surface);
+        const luma = surface[0] * .2126 + surface[1] * .7152 + surface[2] * .0722;
+        if (star) {
+          // Small periodic convection travels with the surface; the projected
+          // features themselves perform a true full longitudinal rotation.
+          const activity = 5 * Math.sin(TAU * (phase * 2 + u * 3)) * Math.cos(g.v * 19 - phase * TAU);
+          const value = clamp(212 + (luma - map.mean) * map.gain + activity, 116, 255) * (.70 + .30 * Math.sqrt(g.z));
+          pixels.data[p] = pixels.data[p + 1] = pixels.data[p + 2] = value;
+          starMean += value * g.alpha; starWeight += g.alpha;
+        } else if (moon) {
+          const value = clamp(102 + (luma - 110) * .78, 55, 200) * (.72 + .28 * g.z);
+          pixels.data[p] = value * 1.03; pixels.data[p + 1] = value * 1.015; pixels.data[p + 2] = value;
+        } else {
+          const land = smooth((surface[0] - surface[2] + 60) / 45);
+          const cloud = smooth((luma - 147) / 72) * (1 - clamp((Math.max(...surface) - Math.min(...surface) - 40) / 70, 0, 1));
+          const detail = clamp(.79 + luma / 470, .80, 1.17), shade = .73 + .27 * g.z;
+          for (let c = 0; c < 3; c++) {
+            const ground = palette[0][c] * (1 - land) + palette[1][c] * land;
+            pixels.data[p + c] = (ground * detail * (1 - cloud) + palette[2][c] * cloud) * shade;
+          }
+        }
+        pixels.data[p + 3] = Math.round(g.alpha * 255);
       }
-      mean /= weight;
-      for (let p = 0; p < values.length; p++) {
-        const q = p * 4, value = clamp(128 + (values[p] - mean) * 490, 22, 234);
-        pixels.data[q] = pixels.data[q + 1] = pixels.data[q + 2] = value;
-        pixels.data[q + 3] = Math.round(mask[p] * 255);
+      if (star) {
+        // Keep the disc's total light stable across the loop. Granulation is
+        // visual texture; it must not impersonate changes in stellar output.
+        const offset = 209 - starMean / starWeight;
+        for (const g of geometry) for (let c = 0; c < 3; c++) pixels.data[g.p + c] = clamp(pixels.data[g.p + c] + offset, 0, 255);
       }
-      overlayContext.putImageData(pixels, 0, 0);
-      const x = frame % ATLAS_COLUMNS * FRAME_SIZE, y = Math.floor(frame / ATLAS_COLUMNS) * FRAME_SIZE;
-      context.save(); context.translate(x, y); context.beginPath(); context.arc(32, 32, 32, 0, TAU); context.clip();
-      context.fillStyle = rgba(STAR[id].rgb, 1); context.fillRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-      context.drawImage(images['star-' + id], 0, 0, FRAME_SIZE, FRAME_SIZE);
-      context.globalCompositeOperation = 'soft-light'; context.globalAlpha = MOTION_STRENGTH * 1.55;
-      context.drawImage(overlay, 0, 0); context.restore(); atlasFrames++;
+      context.putImageData(pixels, 0, 0);
+      const atlas = atlases[name], out = atlas.getContext('2d');
+      out.drawImage(target, frame % ATLAS_COLUMNS * FRAME_SIZE, Math.floor(frame / ATLAS_COLUMNS) * FRAME_SIZE);
+      atlasFrames++;
     };
   }
 
   function bakeAtlases() {
-    if (!granulation) return Promise.resolve();
-    const jobs = [];
-    for (const id of Object.keys(STAR)) {
-      if (!images['star-' + id]) continue;
-      atlases[id] = canvas(ATLAS_COLUMNS * FRAME_SIZE, FRAME_COUNT / ATLAS_COLUMNS * FRAME_SIZE);
-      for (let frame = 0; frame < FRAME_COUNT; frame++) jobs.push([id, frame]);
+    const maps = Object.create(null), jobs = [], names = [];
+    for (const type of ['planet', 'moon', 'star']) {
+      if (!images[type + '-surface']) continue;
+      try { maps[type] = readMap(images[type + '-surface'], type === 'star'); }
+      catch (error) { failures.push(type + ' surface: ' + error.message); }
     }
-    const bake = createAtlasBuilder();
+    if (maps.star) names.push('star');
+    if (maps.moon) names.push('moon');
+    if (maps.planet) names.push('climate0', 'climate1', 'climate2', 'climate3', 'climate4', 'scar');
+    for (const name of names) {
+      atlases[name] = canvas(ATLAS_COLUMNS * FRAME_SIZE, FRAME_COUNT / ATLAS_COLUMNS * FRAME_SIZE);
+      for (let frame = 0; frame < FRAME_COUNT; frame++) jobs.push([name, frame]);
+    }
+    atlasJobs = jobs.length;
+    if (!jobs.length) return Promise.resolve();
+    const bake = createAtlasBuilder(maps);
     return new Promise(resolve => {
-      const queue = callback => typeof window.requestIdleCallback === 'function'
-        ? window.requestIdleCallback(callback, { timeout: 150 })
-        : window.setTimeout(() => callback({ timeRemaining: () => 0 }), 0);
+      // Start after the first paint. Continue in small frame-aligned slices:
+      // repeated idle callbacks can wait 50ms each even on an idle desktop.
+      const queue = (callback, initial = false) => {
+        if (initial && typeof window.requestIdleCallback === 'function')
+          return window.requestIdleCallback(callback, { timeout: 150 });
+        const next = () => callback({ timeRemaining: () => Infinity });
+        return typeof window.requestAnimationFrame === 'function'
+          ? window.requestAnimationFrame(next) : window.setTimeout(next, 0);
+      };
+      let index = 0;
       const step = deadline => {
         try {
-          let count = 0;
-          do { const job = jobs.shift(); if (job) bake(job[0], job[1]); count++; }
-          while (jobs.length && count < 3 && deadline.timeRemaining() > 3);
-          if (jobs.length) queue(step); else { atlasReady = true; resolve(); }
+          let count = 0; const started = performance.now();
+          do {
+            const [name, frame] = jobs[index++]; bake(name, frame); count++;
+            if (frame === FRAME_COUNT - 1) {
+              if (name === 'scar') rotationReady.planet = true;
+              if (name === 'moon') rotationReady.moon = true;
+              if (name === 'star') rotationReady.star = true;
+            }
+          } while (index < jobs.length && count < 32 && performance.now() - started < 5 && deadline.timeRemaining() > 3);
+          if (index < jobs.length) queue(step); else { atlasReady = true; resolve(); }
         } catch (error) { failures.push('atlas: ' + error.message); resolve(); }
       };
-      queue(step);
+      queue(step, true);
     });
   }
 
@@ -183,32 +255,62 @@
       FRAME_SIZE, FRAME_SIZE, x, y, size, size);
   }
 
-  function starSurface(id, time, quality, reducedMotion) {
-    if (!atlasReady || !atlases[id] || quality >= 2) return images['star-' + id];
-    const fps = quality >= 1 ? 15 : 30, step = quality >= 1 ? 2 : 1;
-    const tick = reducedMotion ? 0 : Math.floor(time * fps) / fps;
-    let cache = blends[id];
-    if (!cache) { const target = canvas(FRAME_SIZE, FRAME_SIZE); cache = blends[id] = { canvas: target, context: target.getContext('2d'), key: '' }; }
-    const key = tick + ':' + step;
+  function rotationPhase(spec, type) {
+    const id = String(spec.bodyId ?? (type === 'planet' || type === 'moon' ? type : spec.id));
+    let hash = 2166136261;
+    for (let i = 0; i < id.length; i++) { hash ^= id.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+    const offset = (hash >>> 0) / 4294967296 + (STAR[type] ? STAR[type].phase / TAU : 0);
+    const quality = clamp(Math.floor(finite(spec.quality, 0)), 0, 2), fps = [30, 20, 12][quality];
+    const seconds = spec.reducedMotion ? 0 : Math.floor(finite(spec.spinTime, 0) * fps) / fps;
+    const phase = ((seconds / PERIODS[type] + offset) % 1 + 1) % 1;
+    recentPhases[type + ':' + id] = phase;
+    // Diagnostic history stays bounded even if the user creates many bodies.
+    if (Object.keys(recentPhases).length > 24) delete recentPhases[Object.keys(recentPhases)[0]];
+    return phase;
+  }
+
+  function layer(key) {
+    if (!blends[key]) {
+      // Runtime scratch surfaces are bounded independently of body IDs.
+      if (Object.keys(blends).length >= 16) delete blends[Object.keys(blends)[0]];
+      const target = canvas(FRAME_SIZE, FRAME_SIZE);
+      blends[key] = { canvas: target, context: target.getContext('2d'), key: '' };
+    }
+    return blends[key];
+  }
+
+  function drawWeightedFrames(g, name, phase, weight, clear) {
+    if (!weight) return;
+    const position = phase * FRAME_COUNT, first = Math.floor(position) % FRAME_COUNT, mix = position - Math.floor(position);
+    g.globalCompositeOperation = clear ? 'source-over' : 'lighter'; g.globalAlpha = weight * (1 - mix);
+    atlasFrame(g, atlases[name], first, 0, 0, FRAME_SIZE);
+    if (mix > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = weight * mix; atlasFrame(g, atlases[name], (first + 1) % FRAME_COUNT, 0, 0, FRAME_SIZE); }
+  }
+
+  function starSurface(spec) {
+    if (!rotationReady.star) return images['star-' + spec.id];
+    const phase = rotationPhase(spec, spec.id), cache = layer('star:' + spec.id), key = String(phase);
     if (cache.key === key) return cache.canvas;
     cache.key = key;
-    const position = (((tick % LOOP_SECONDS) + LOOP_SECONDS) % LOOP_SECONDS) / LOOP_SECONDS * FRAME_COUNT / step;
-    const first = Math.floor(position) * step, second = (first + step) % FRAME_COUNT, mix = position - Math.floor(position);
     const g = cache.context; g.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-    // Add premultiplied weighted frames in an isolated small layer. Applying
-    // caller alpha later avoids the dark fringes / opacity pulse of two fades.
-    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1 - mix;
-    atlasFrame(g, atlases[id], first, 0, 0, FRAME_SIZE);
-    if (mix > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = mix; atlasFrame(g, atlases[id], second, 0, 0, FRAME_SIZE); }
-    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    drawWeightedFrames(g, 'star', phase, 1, true);
+    g.globalAlpha = 1; g.globalCompositeOperation = 'multiply';
+    // Tint within the sphere only; source-atop restores its antialiased edge.
+    g.save(); g.beginPath(); g.arc(FRAME_SIZE / 2, FRAME_SIZE / 2, FRAME_SIZE / 2 - .1, 0, TAU); g.clip();
+    g.fillStyle = rgba(STAR[spec.id].rgb.map(value => Math.round(90 + value * .647)), 1); g.fillRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+    g.restore();
+    g.globalCompositeOperation = 'destination-in';
+    const mask = layer('star-mask');
+    if (mask.key !== key) { mask.context.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE); drawWeightedFrames(mask.context, 'star', phase, 1, true); mask.key = key; }
+    g.drawImage(mask.canvas, 0, 0); g.globalCompositeOperation = 'source-over';
     return cache.canvas;
   }
 
   function drawStar(ctx, spec) {
-    if (!ctx || !hasPosition(spec) || !STAR[spec.id] || !images['star-' + spec.id]) return false;
+    if (!ctx || !hasPosition(spec) || !STAR[spec.id] || (!rotationReady.star && !images['star-' + spec.id])) return false;
     const alpha = opacity(spec.alpha); if (!alpha) return true;
     const quality = clamp(Math.floor(finite(spec.quality, 0)), 0, 2), time = spec.reducedMotion ? 0 : finite(spec.time, 0);
-    const source = starSurface(spec.id, time, quality, !!spec.reducedMotion), { x, y, r } = spec;
+    const source = starSurface(spec), { x, y, r } = spec;
     ctx.save(); ctx.globalAlpha *= alpha;
     const baseAlpha = ctx.globalAlpha;
     ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.clip(); ctx.drawImage(source, x - r, y - r, r * 2, r * 2); ctx.restore();
@@ -233,7 +335,7 @@
     ctx.restore(); return true;
   }
 
-  function worldSurface(climate, moon, ripped) {
+  function staticWorldSurface(climate, moon, ripped) {
     if (moon) return images.moon || null;
     const value = clamp(finite(climate, 2), 0, 4), low = Math.floor(value), high = Math.min(4, low + 1);
     const a = images[CLIMATES[low]], b = images[CLIMATES[high]], mix = value - low;
@@ -252,9 +354,38 @@
     return worldLayer;
   }
 
+  function worldSurface(spec) {
+    const moon = !!spec.moon, type = moon ? 'moon' : 'planet';
+    if (!rotationReady[type]) return staticWorldSurface(spec.climate, moon, !!spec.ripped);
+    const phase = rotationPhase(spec, type), climate = clamp(finite(spec.climate, 2), 0, 4);
+    const cache = layer(type + ':' + String(spec.bodyId ?? type));
+    const key = phase + ':' + climate + ':' + !!spec.ripped;
+    if (cache.key === key) return cache.canvas;
+    cache.key = key;
+    const g = cache.context; g.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+    if (moon) drawWeightedFrames(g, 'moon', phase, 1, true);
+    else {
+      const low = Math.floor(climate), high = Math.min(4, low + 1), mix = climate - low;
+      // Four weighted samples blend both longitude and climate without changing
+      // geography or darkening the shared antialiased silhouette.
+      drawWeightedFrames(g, 'climate' + low, phase, 1 - mix, true);
+      if (mix) drawWeightedFrames(g, 'climate' + high, phase, mix, false);
+      if (spec.ripped) {
+        const mark = layer('scar');
+        if (mark.key !== String(phase)) {
+          mark.context.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+          drawWeightedFrames(mark.context, 'scar', phase, 1, true); mark.key = String(phase);
+        }
+        g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.drawImage(mark.canvas, 0, 0);
+      }
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    return cache.canvas;
+  }
+
   function drawWorld(ctx, spec) {
     if (!ctx || !hasPosition(spec)) return false;
-    const source = worldSurface(spec.climate, !!spec.moon, !!spec.ripped);
+    const source = worldSurface(spec);
     if (!source) return false;
     const alpha = opacity(spec.alpha) * clamp(finite(spec.detail, .7), 0, 1); if (!alpha) return true;
     const { x, y, r } = spec;
@@ -267,16 +398,18 @@
     const atlasBytes = Object.values(atlases).reduce((sum, item) => sum + item.width * item.height * 4, 0);
     const scratchBytes = Object.values(blends).length * FRAME_SIZE * FRAME_SIZE * 4
       + Object.keys(wisps).length * 32 * 32 * 4 + (scar ? WORLD_SIZE * WORLD_SIZE * 4 : 0)
-      + (worldLayer ? WORLD_SIZE * WORLD_SIZE * 4 : 0) + (granulation ? granulation.byteLength : 0);
+      + (worldLayer ? WORLD_SIZE * WORLD_SIZE * 4 : 0);
     return { ready: prepared, assetsLoaded: [...loaded], failures: [...failures], atlasReady,
-      atlasFrames, atlasFrameSize: FRAME_SIZE, atlasFramesPerStar: FRAME_COUNT, atlasLoopSeconds: LOOP_SECONDS,
-      atlasProgress: atlasFrames / (FRAME_COUNT * Object.keys(STAR).length), preparationMs: Math.round(preparationMs),
+      atlasFrames, atlasFrameSize: FRAME_SIZE, atlasFramesPerRotation: FRAME_COUNT, atlasNames: Object.keys(atlases),
+      rotationReady: { ...rotationReady }, rotationPeriods: { ...PERIODS }, recentPhases: { ...recentPhases },
+      scratchLayers: Object.keys(blends).length,
+      atlasProgress: atlasJobs ? atlasFrames / atlasJobs : 0, preparationMs: Math.round(preparationMs),
       decodedBytes, atlasBytes, scratchBytes, estimatedBytes: decodedBytes + atlasBytes + scratchBytes };
   }
 
   const ready = Promise.all(ASSETS.map(load)).then(async () => {
     const start = performance.now();
-    try { prepareScar(); prepareWisps(); if (prepareMap()) await bakeAtlases(); }
+    try { prepareScar(); prepareWisps(); await bakeAtlases(); }
     catch (error) { failures.push('preparation: ' + error.message); }
     preparationMs = performance.now() - start; prepared = true;
     return status();

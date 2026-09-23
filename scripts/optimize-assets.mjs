@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const target = path.join(root, 'public/assets/bodies');
 const sets = [
   { folder: 'output/body-assets-v2', names: ['star-amber', 'star-cyan', 'star-coral', 'planet-frozen', 'planet-temperate', 'planet-hot', 'moon'] },
-  { folder: 'output/body-motion-v3', names: ['planet-thawing', 'planet-warming', 'planet-stripped', 'stellar-granulation', 'debris-fragment'] },
+  { folder: 'output/body-motion-v3', names: ['planet-thawing', 'planet-warming', 'planet-stripped', 'debris-fragment'] },
 ];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 await mkdir(target, { recursive: true });
@@ -25,7 +25,7 @@ for (const set of sets) {
     if (name.startsWith('planet-')) {
       // Every climate state shares this crop: cross-fading must not change the disc footprint.
       crop = { left: 88, top: 94, width: 1080, height: 1080 };
-    } else if (name !== 'stellar-granulation') {
+    } else {
       let bounds = entry?.alpha128Bounds ?? entry?.opaqueBounds;
       if (!bounds) {
         // Metadata fallback uses meaningful alpha, ignoring near-transparent stray pixels.
@@ -46,7 +46,7 @@ for (const set of sets) {
         crop = { left: Math.max(0, Math.min(metadata.width - side, Math.floor((left + right - side) / 2))), top: Math.max(0, Math.min(metadata.height - side, Math.floor((top + bottom - side) / 2))), width: side, height: side };
       }
     }
-    const size = name === 'stellar-granulation' ? 128 : name === 'debris-fragment' ? 64 : 256;
+    const size = name === 'debris-fragment' ? 64 : 256;
     let pipeline = sharp(input);
     if (crop) pipeline = pipeline.extract(crop);
     const { data, info } = await pipeline.resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82, alphaQuality: 100, effort: 6 }).toBuffer({ resolveWithObject: true });

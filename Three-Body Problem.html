@@ -1285,7 +1285,7 @@ const world = {
 };
 const cam = { x: 0, y: 0, scale: 120, auto: true, inited: false, vx: 0, vy: 0, vs: 0, prev: null, cut: true };
 const view = { w: 1, h: 1, dpr: 1, cx: 0, cy: 0, safe: { l: 0, t: 0, r: 1, b: 1 }, tcx: 0, tcy: 0 };
-const visuals = { time: 0, climates: new Map() };
+const visuals = { time: 0, spinTime: 0, climates: new Map() };
 const bodyRenderer = window.BodyRenderer;
 const eventEffects = window.EventEffects ? window.EventEffects.create({ maxEffects: 12 }) : null;
 const perf = { quality: 0, ema: 1 / 60, bad: 0 };      // drawing detail steps down on slow devices; the physics never does
@@ -1941,12 +1941,16 @@ function climateTexture(T) {              // same temperature endpoints as the e
   return clamp(2 + (T - 300) / 22.5, 2, 4);
 }
 function resetVisuals() {
-  visuals.time = 0; visuals.climates.clear();
+  visuals.time = 0; visuals.spinTime = 0; visuals.climates.clear();
   if (eventEffects) eventEffects.reset();
 }
-function updateVisuals(dt) {
+function updateVisuals(dt, simulationDt = 0) {
   const running = world.playing && !document.hidden;
-  if (running && !reducedMotion) visuals.time += dt;
+  if (running && !reducedMotion) {
+    visuals.time += dt;
+    // Rotation follows the time actually simulated, including speed changes, close-pass slowdown and the frame budget.
+    visuals.spinTime += Math.max(0, simulationDt) / world.preset.rate;
+  }
   const live = new Set();
   for (const b of world.cur) {
     if (isStar(b.m) && !isWorld(b)) continue;
@@ -2203,8 +2207,8 @@ function drawBodies(paused) {
     const d = drawn.get(q.id), col = colorOf(q), lab = labelOf(q);
     ctx.fillStyle = rgba(col, 1); ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI); ctx.fill();
     if (bodyRenderer && d.r >= 2.2) {
-      const common = { x: d.x, y: d.y, r: d.r, theme: theme.additive ? 'dark' : 'light' };
-      if (isStar(q.m) && !isWorld(q)) bodyRenderer.drawStar(ctx, { ...common, id: ['amber', 'cyan', 'coral'][q.id % 3], time: visuals.time, quality: perf.quality, reducedMotion });
+      const common = { x: d.x, y: d.y, r: d.r, theme: theme.additive ? 'dark' : 'light', bodyId: q.id, time: visuals.time, spinTime: visuals.spinTime, quality: perf.quality, reducedMotion };
+      if (isStar(q.m) && !isWorld(q)) bodyRenderer.drawStar(ctx, { ...common, id: ['amber', 'cyan', 'coral'][q.id % 3] });
       else bodyRenderer.drawWorld(ctx, { ...common, climate: visuals.climates.get(q.id) ?? climateTexture(tempOf(q, b)), moon: q.kind === 'moon', ripped: q.ripped && q.kind !== 'moon', detail: theme.additive ? 0.72 : 0.62 });
     }
     ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
@@ -2973,6 +2977,7 @@ function frame(now) {
   tick(now, dt);
 }
 function tick(now, dt) {                   // one frame's worth of simulation and drawing
+  const previousTime = world.t;
   if (world.playing) {
     perf.ema += (dt - perf.ema) * 0.05;
     if (perf.ema > 0.026) { if (++perf.bad > 150 && perf.quality < 2) { perf.quality++; perf.bad = 0; } } else if (perf.bad > 0) perf.bad--;
@@ -2983,7 +2988,7 @@ function tick(now, dt) {                   // one frame's worth of simulation an
     world.t = got;
   }
   world.cur = sampleBodies(world.sys, world.t);
-  updateVisuals(dt);
+  updateVisuals(dt, world.t - previousTime);
   if (world.playing && now > watchAt) { watchAt = now + 160; watch(); }
   if (bodiesDirty) refreshBodies();
   updateCamera(dt);

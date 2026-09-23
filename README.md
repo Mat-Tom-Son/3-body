@@ -16,13 +16,17 @@ Open [localhost:3000](http://localhost:3000). Set `PORT` to change the port. `np
 
 ## Build and assets
 
-Stars have evolving granular surfaces and small edge wisps. Planet textures move continuously through frozen, thawing, temperate, drying, and hot states, driven by the existing temperature model. Tidal debris, moon formation, impacts, and stellar swallowing follow actual event body IDs and current positions. The neutral scar layer preserves a damaged planet's climate. Labels and the existing night-side illumination remain separate from the images.
+Stars, planets, and moons have rotating spherical surfaces. Three generated surface maps supply terrain, lunar craters, and stellar granulation. Planet textures move continuously through frozen, thawing, temperate, drying, and hot states, driven by the existing temperature model; all states share the same geography and rotation. Tidal debris, moon formation, impacts, and stellar swallowing follow actual event body IDs and current positions. A damaged planet's scar rotates with its surface and preserves its climate. Labels, halos, and the existing night-side illumination remain separate from the rotating textures.
 
-The twelve WebPs total **185,756 bytes**. Star movement uses a small atlas prepared in idle batches; no per-pixel processing runs in the animation loop. All effects pause with playback, reset with a new run or undo, and use reduced detail on slower devices. Reduced-motion preference keeps star surfaces static and limits event accents. Hidden tabs stop simulation and drawing. The visuals do not change the integration method, timestep tolerance, or climate calculations.
+The fourteen WebPs total **290,634 bytes**, including **110,442 bytes** for the three new surface maps. The renderer projects 64 px frames into bounded atlases during short preparation batches, then blends cached frames without per-pixel work during drawing. The three stars share one projected atlas; the total estimated decoded image, atlas, and scratch memory is about 12.2 MiB. Original sprites remain as loading and failure fallbacks.
+
+Rotation follows actual simulation progress, normalized by each preset's playback rate. At 1×, the planet turns in 24 seconds, the moon in 56 seconds, and the amber/cyan/coral stars in 48/56/64 seconds. These are presentation timings, not simulated physical spin periods. The 0.25×–8× controls scale rotation proportionally, including automatic close-pass slowdown and CPU throttling. Changing speed preserves phase. Short event accents retain their real-time durations so they remain legible at high speed.
+
+All effects pause with playback, reset with a new run or undo, and use reduced detail on slower devices. Reduced-motion preference keeps surfaces static and limits event accents. Hidden tabs stop simulation and drawing. The visuals do not change the integration method, timestep tolerance, or climate calculations.
 
 - `Three-Body Problem.html` contains the interface and simulation.
 - `src/` contains the body rendering and event effects.
-- `public/assets/bodies/` contains the twelve approved, optimized WebP assets.
+- `public/assets/bodies/` contains the optimized sprites and surface maps.
 - `scripts/build.mjs` creates `dist/index.html`, copies only publishable files from `src/` and `public/`, versions script URLs from their content, and creates Brotli/gzip representations and a build manifest.
 - `server.mjs` serves only the built `dist/` tree, accepts GET/HEAD, revalidates stable URLs with content ETags, and exposes `/healthz`. It binds to `0.0.0.0` and the `PORT` environment variable.
 
@@ -34,7 +38,9 @@ npm run assets:optimize
 npm run build
 ```
 
-The optimizer expects the seven original PNGs and manifest under `output/body-assets-v2/` and five under `output/body-motion-v3/`. It performs only the approved crop, resize, and WebP compression. Planet states share one crop to keep their silhouettes aligned. Other bodies use centered crops; granulation is 128 px and debris is at most 64 px. Exact settings, source checksums, output sizes, and output checksums are recorded in `scripts/asset-build-report.json`. The original masters, preview studies, earlier audio, and local browser artifacts remain excluded from the repository and deployed image.
+The sprite optimizer expects the original PNGs and manifests under `output/body-assets-v2/` and `output/body-motion-v3/`. It performs only crop, resize, and WebP compression. Planet states share one crop to keep their silhouettes aligned. Other bodies use centered crops; debris is at most 64 px. The old square granulation texture is retired from the deployment. Exact settings, source checksums, output sizes, and output checksums are recorded in `scripts/asset-build-report.json`.
+
+For the rotating surfaces, `npm run assets:rotation` resizes and compresses the three generated masters in `output/body-rotation-v4/images/` to 512×256 WebPs. The built-in image generation prompts are recorded in `scripts/rotation-asset-prompts.json`, and the compression settings and checksums are in `scripts/rotation-asset-build-report.json`. The renderer handles longitude seams, poles, climate palettes, fixed limb shading, and continuous frame blending. The original masters, preview studies, earlier audio, and local browser artifacts remain excluded from the repository and deployed image.
 
 ## Docker
 
@@ -58,7 +64,7 @@ These are deployment instructions, not a claim that a Railway service is already
 
 Run `npm run check` locally before pushing. It runs all tests and creates the production build; no GitHub Actions workflow is configured.
 
-`npm test` exercises real simulation event metadata and mass/momentum conservation, effect attachment and cancellation, pause/reset/reduced motion, particle budgets, build isolation, repeatable output, compression, GET/HEAD, cache revalidation, healthchecks, malformed URLs, traversal attempts, and symlinks. Browser testing is still necessary for the interactive simulation and its visual effects.
+`npm test` exercises real simulation event metadata and mass/momentum conservation, effect attachment and cancellation, pause/reset/reduced motion, particle budgets, all playback speeds, rotation phase continuity and simulation throttling, projected surface seams, climate/scar alignment, bounded rendering caches, missing art, build isolation, repeatable output, compression, GET/HEAD, cache revalidation, healthchecks, malformed URLs, traversal attempts, and symlinks. Browser testing is still necessary for the interactive simulation and its visual effects.
 
 To verify the deployment image locally, start Docker and use the build/run commands above. With the container running, check its health and asset delivery from another terminal:
 
