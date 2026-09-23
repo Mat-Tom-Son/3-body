@@ -8,8 +8,7 @@ Use Node.js 24 LTS (Node 22 or newer is supported).
 
 ```sh
 npm ci
-npm test
-npm run build
+npm run check
 npm start
 ```
 
@@ -57,4 +56,14 @@ These are deployment instructions, not a claim that a Railway service is already
 
 ## Checks
 
-`npm test` exercises real simulation event metadata and mass/momentum conservation, effect attachment and cancellation, pause/reset/reduced motion, particle budgets, build isolation, repeatable output, compression, GET/HEAD, cache revalidation, healthchecks, malformed URLs, traversal attempts, and symlinks. GitHub Actions runs those tests, a production build, and a Docker build/healthcheck on pushes and pull requests. Browser testing is still necessary for the interactive simulation and its visual effects.
+Run `npm run check` locally before pushing. It runs all tests and creates the production build; no GitHub Actions workflow is configured.
+
+`npm test` exercises real simulation event metadata and mass/momentum conservation, effect attachment and cancellation, pause/reset/reduced motion, particle budgets, build isolation, repeatable output, compression, GET/HEAD, cache revalidation, healthchecks, malformed URLs, traversal attempts, and symlinks. Browser testing is still necessary for the interactive simulation and its visual effects.
+
+To verify the deployment image locally, start Docker and use the build/run commands above. With the container running, check its health and asset delivery from another terminal:
+
+```sh
+curl --fail http://localhost:3000/healthz
+curl --fail --head http://localhost:3000/
+curl --fail --output /dev/null http://localhost:3000/assets/bodies/star-amber.webp
+```
