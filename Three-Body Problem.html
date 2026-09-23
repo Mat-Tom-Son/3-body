@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Three-Body Problem</title>
 <meta name="description" content="An interactive gravitational simulation of three bodies, and of a world that lives, and dies, under three suns.">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark light">
+<script src="src/appearance.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%230B1E36%27/%3E%3Ccircle cx=%2720%27 cy=%2742%27 r=%279%27 fill=%27%23FFCB52%27/%3E%3Ccircle cx=%2744%27 cy=%2744%27 r=%276%27 fill=%27%238FDCFF%27/%3E%3Ccircle cx=%2734%27 cy=%2718%27 r=%277%27 fill=%27%23FF8A6B%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,42 +52,7 @@
   --additive: 0;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --field-0: #123157;
-    --field-1: #081729;
-    --ink: #EAF2FA;
-    --ink-2: rgba(234, 242, 250, .78);
-    --ink-3: rgba(234, 242, 250, .52);
-    --line: rgba(234, 242, 250, .2);
-    --line-strong: rgba(234, 242, 250, .48);
-    --fill: rgba(234, 242, 250, .07);
-    --fill-strong: rgba(234, 242, 250, .14);
-    --glass: rgba(9, 26, 47, .7);
-    --panel: rgba(10, 28, 51, .96);
-    --primary-bg: #EAF2FA;
-    --primary-fg: #0B1E36;
-    --body-a: #FFCB52;
-    --body-b: #8FDCFF;
-    --body-c: #FF8A6B;
-    --body-ink: #0B1E36;
-    --world-cold: #CDE3F4;
-    --world-mild: #45C9A6;
-    --world-hot: #9C3118;
-    --moon: #AEB9C6;
-    --era-stable: #6F93B8;
-    --era-chaotic: #F2B449;
-    --heat-cold: #5C93FF;
-    --heat-mid: #6E7E92;
-    --heat-hot: #FF6338;
-    --halo: rgba(8, 23, 41, .92);
-    --scrim: rgba(2, 8, 16, .5);
-    --shadow: rgba(0, 0, 0, .4);
-    --additive: 1;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
+:root:not([data-theme="light"]) {
   --field-0: #123157;
   --field-1: #081729;
   --ink: #EAF2FA;
@@ -306,13 +272,13 @@ body.bottom-sheet.customizing .transport, body.bottom-sheet.customizing .scale {
 }
 
 /* customize: bodies */
-.bodies { display: flex; gap: 8px; margin: 4px 0 2px; }
-.body-chip { flex: 1; height: 48px; border-radius: 14px; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: .875rem; color: var(--ink-2); min-width: 0; }
-.body-chip .dot { width: 26px; height: 26px; border-radius: 50%; background: var(--c); color: var(--body-ink); font-weight: 600; font-size: .8125rem; display: grid; place-items: center; flex: 0 0 auto; }
-.body-chip .dot.wide { font-size: .625rem; letter-spacing: -.02em; }
-.body-chip .mm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bodies { display: grid; grid-template-columns: repeat(var(--body-columns, 4), minmax(0, 1fr)); gap: 8px; margin: 4px 0 2px; }
+.body-chip { padding: 8px 4px 10px; border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink-2); min-width: 0; }
+.body-chip .body-art { display: block; width: 40px; height: 40px; flex: 0 0 auto; }
+.body-chip .body-name { font-weight: 500; font-size: .8125rem; line-height: 1.4; overflow-wrap: anywhere; }
+.body-chip .mm { font-size: .75rem; line-height: 1.35; font-variant-numeric: tabular-nums; }
+.body-chip .mass-unit { display: block; color: var(--ink-2); font-size: .6875rem; }
 .body-chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--fill); color: var(--ink); }
-@container sheet (max-width: 349px) { .body-chip .mm { display: none; } }
 
 .field { margin-top: 12px; }
 .field-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .875rem; color: var(--ink-2); margin: 0 2px 4px; }
@@ -538,6 +504,13 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     </div>
 
     <div class="pane" id="pane-view" role="tabpanel" aria-labelledby="tab-view" hidden>
+      <div class="field">
+        <div class="field-head"><span id="appearanceLbl">Appearance</span></div>
+        <div class="seg" role="radiogroup" aria-labelledby="appearanceLbl" id="appearanceSeg">
+          <button type="button" role="radio" data-v="dark" aria-checked="true" tabindex="0">Dark</button>
+          <button type="button" role="radio" data-v="light" aria-checked="false" tabindex="-1">Light</button>
+        </div>
+      </div>
       <div class="field">
         <div class="field-head"><span id="trailsLbl">Trails</span></div>
         <div class="seg" role="radiogroup" aria-labelledby="trailsLbl" id="trailSeg">
@@ -1200,7 +1173,7 @@ function fmtMass(m) {
   if (m < 0.00999) { v = m / M_JUP; u = 'Jupiter'; }
   if (m < 2.99e-5) { v = m / M_EARTH; u = 'Earth'; }
   const s = sig(v, 3);
-  return s + ' ' + u + (s === '1' ? '' : 's');
+  return s + ' × ' + u + ' mass';
 }
 function fmtKm(km) {
   if (km < 100) return sig(km, 3) + ' km';
@@ -1908,7 +1881,7 @@ const dom = {};
 ['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
   'context', 'undoBtn', 'resetBtn', 'skyBtn', 'skyPill', 'skiesSheet', 'skyGrid', 'seedForm', 'seedInput', 'planetBtn', 'eraOut', 'eraLbl', 'eraStrip', 'historySheet', 'histBody', 'histCanvas', 'histTip', 'histLegend', 'histStats', 'histLog', 'fitBtn', 'transport', 'restartBtn', 'playBtn', 'playIcon', 'slowerBtn', 'fasterBtn', 'speedOut', 'scrim',
   'presetSheet', 'presetGrid', 'customSheet', 'scienceSheet', 'sciBody', 'sheetPlay', 'sheetPlayIcon', 'sheetRestart', 'bodyChips', 'massRange', 'massVal',
-  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg'].forEach(id => { dom[id] = $(id); });
+  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg'].forEach(id => { dom[id] = $(id); });
 dom.topLeft = document.querySelector('.top-left'); dom.topRight = document.querySelector('.top-right');
 const ctx = dom.sky.getContext('2d');
 const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -2412,9 +2385,24 @@ function refreshSpeed() {
 function setSpeed(i) { ui.speed = clamp(i, 0, SPEEDS.length - 1); store.set('speed2', ui.speed); throttle.on = false; refreshSpeed(); }
 
 /* ------------------------------------------------------------------ customize: bodies */
-const VAR = ['var(--body-a)', 'var(--body-b)', 'var(--body-c)'];
-const chipColor = b => (b.kind === 'moon' ? 'var(--moon)' : b.kind === 'planet' ? 'var(--world-mild)' : VAR[b.id] || 'var(--moon)');
 let chipSig = '';
+let chipArtReady = false;
+function drawBodyChip(cv, b) {
+  const star = isStar(b.m) && !isWorld(b), moon = b.kind === 'moon';
+  const climate = star ? 0 : Math.round((visuals.climates.get(b.id) ?? climateTexture(tempOf(b, world.cur))) * 10) / 10;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), col = colorOf(b).map(Math.round);
+  const key = [chipArtReady, star, moon, b.ripped, climate, theme.additive, col.join(','), dpr].join(':');
+  if (cv.dataset.artKey === key) return;
+  cv.dataset.artKey = key; cv.width = cv.height = 40 * dpr;
+  const k = cv.getContext('2d'); k.setTransform(dpr, 0, 0, dpr, 0, 0);
+  k.fillStyle = rgba(col, 1); k.beginPath(); k.arc(20, 20, 16, 0, Math.PI * 2); k.fill();
+  if (!bodyRenderer) return;
+  // Reuse the game's cached surfaces. Inspector thumbnails stay still while
+  // their climate follows the world, without adding another animation loop.
+  const spec = { x: 20, y: 20, r: 16, bodyId: 'chip-' + b.id, time: 0, spinTime: 0, reducedMotion: true, theme: theme.additive ? 'dark' : 'light' };
+  if (star) bodyRenderer.drawStar(k, { ...spec, id: ['amber', 'cyan', 'coral'][b.id % 3] });
+  else bodyRenderer.drawWorld(k, { ...spec, climate, moon, ripped: b.ripped && !moon, detail: theme.additive ? .72 : .62 });
+}
 function refreshBodies(force) {
   bodiesDirty = false;
   if (ui.sheet !== 'custom' && !force) return;
@@ -2423,18 +2411,24 @@ function refreshBodies(force) {
   const sigNow = list.map(b => b.id + ':' + labelOf(b)).join('|');
   if (sigNow !== chipSig) {
     chipSig = sigNow; dom.bodyChips.textContent = '';
+    dom.bodyChips.style.setProperty('--body-columns', Math.min(list.length, list.length > 4 ? 3 : 4));
     for (const b of list) {
-      const lab = labelOf(b), btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'body-chip'; btn.dataset.id = b.id; btn.style.setProperty('--c', chipColor(b));
-      btn.innerHTML = '<span class="dot' + (lab.length > 1 ? ' wide' : '') + '" aria-hidden="true">' + lab + '</span><span class="mm"></span>';
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'body-chip'; btn.dataset.id = b.id;
+      btn.innerHTML = '<canvas class="body-art" width="80" height="80" aria-hidden="true"></canvas><span class="body-name" aria-hidden="true"></span><span class="mm" aria-hidden="true"><span class="mass-number"></span><span class="mass-unit"></span></span>';
       dom.bodyChips.appendChild(btn);
     }
   }
   for (const btn of dom.bodyChips.children) {
     const b = bodyById(list, +btn.dataset.id); if (!b) continue;
+    const name = isWorld(b) ? (b.kind === 'moon' ? 'Moon' : 'Planet') : (isStar(b.m) ? 'Sun ' : 'Planet ') + labelOf(b);
+    const [mass, unit] = fmtMass(b.m).split(' × ');
     btn.setAttribute('aria-pressed', String(b.id === world.sel));
-    btn.setAttribute('aria-label', (isWorld(b) ? (b.kind === 'moon' ? 'The moon' : 'The planet') : 'Body ' + labelOf(b)) + ', ' + fmtMass(b.m));
-    btn.lastChild.textContent = fmtMass(b.m);
+    btn.setAttribute('aria-label', name + ', ' + fmtMass(b.m));
+    btn.querySelector('.body-name').textContent = name;
+    btn.querySelector('.mass-number').textContent = mass + '×';
+    btn.querySelector('.mass-unit').textContent = unit;
+    drawBodyChip(btn.querySelector('.body-art'), b);
   }
   const q = bodyById(list, world.sel); if (!q) return;
   const p = clamp((Math.log10(q.m) - Math.log10(MASS_MIN)) / (Math.log10(MASS_MAX) - Math.log10(MASS_MIN)), 0, 1);
@@ -2506,6 +2500,10 @@ function startRepeat(btn, e) {
 
 /* ------------------------------------------------------------------ customize: view */
 function refreshViewPane() {
+  for (const b of dom.appearanceSeg.children) {
+    const on = b.dataset.v === document.documentElement.dataset.theme;
+    b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
+  }
   for (const b of dom.trailSeg.children) b.setAttribute('aria-checked', String(b.dataset.v === ui.view.trails));
   document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-checked', String(!!ui.view[b.dataset.view])));
 }
@@ -2906,15 +2904,21 @@ function wire() {
   cs.addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b && e.detail === 0) stepField(b.dataset.step, +b.dataset.dir); });   // keyboard
   cs.addEventListener('contextmenu', e => { if (e.target.closest('[data-step]')) e.preventDefault(); });
 
+  dom.appearanceSeg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.documentElement.dataset.theme = b.dataset.v;
+    store.set('appearance', b.dataset.v); refreshViewPane();
+  });
   dom.trailSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.view.trails = b.dataset.v; store.set('view', ui.view); refreshViewPane(); invalidate(); });
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.view; ui.view[k] = !ui.view[k]; store.set('view', ui.view); refreshViewPane(); invalidate();
     if (k === 'com' && ui.view.com) say('com', 'The cross marks the center of mass, the balance point of the whole group. Nothing the bodies do to one another can move it off its straight path.', true, { now: true });
   }));
-  [dom.trailSeg].forEach(seg => seg.addEventListener('keydown', e => {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  [dom.trailSeg, dom.appearanceSeg].forEach(seg => seg.addEventListener('keydown', e => {
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
     const items = [...seg.children], i = items.indexOf(document.activeElement); if (i < 0) return;
-    const n = items[(i + (e.key === 'ArrowRight' ? 1 : items.length - 1)) % items.length]; n.focus(); n.click(); e.preventDefault();
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+    const n = items[next]; n.focus(); n.click(); e.preventDefault();
   }));
 
   window.addEventListener('keydown', e => {
@@ -2937,8 +2941,7 @@ function wire() {
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 120));
   if (window.ResizeObserver) new ResizeObserver(resize).observe(document.body);
-  const mq = matchMedia('(prefers-color-scheme: dark)'), onTheme = () => { readTheme(); if (ui.sheet === 'preset') renderPresets(); };
-  if (mq.addEventListener) mq.addEventListener('change', onTheme); else if (mq.addListener) mq.addListener(onTheme);
+  const onTheme = () => { readTheme(); refreshViewPane(); refreshBodies(); if (ui.sheet === 'preset') renderPresets(); };
   if (drawerMQ.addEventListener) drawerMQ.addEventListener('change', resize);
   const onMotion = () => { reducedMotion = motionMQ.matches; if (reducedMotion) setPlaying(false); invalidate(); };
   if (motionMQ.addEventListener) motionMQ.addEventListener('change', onMotion);
@@ -3014,7 +3017,7 @@ function init() {
   if (linked && linked.key !== 'default') say('sky', 'Sky ‘' + linked.name + '’, from the link. ' + skyParams(linked.c), true, { now: true });
   world.playing = !reducedMotion;
   refreshChrome(); measure();
-  if (bodyRenderer) bodyRenderer.ready.then(() => invalidate()).catch(() => invalidate());
+  if (bodyRenderer) bodyRenderer.ready.then(() => { chipArtReady = true; refreshBodies(); invalidate(); }).catch(() => invalidate());
   requestAnimationFrame(frame);
 }
 init();
