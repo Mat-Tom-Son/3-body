@@ -8,14 +8,7 @@ import { DEG, smoothstep } from './surface-model.js';
 const MAX_SUNS = 6, R_SKY = 3000, R_STARS = 2800, R_SUNS = 2500, R_WORLDS = 2400;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
-/* Ground colours along the flat page's climate index (0 frozen … 4 hot), in linear light. */
-const GROUND = [[0.70, 0.76, 0.84], [0.30, 0.31, 0.29], [0.10, 0.17, 0.07], [0.36, 0.25, 0.12], [0.16, 0.05, 0.03]];
-/* a world with no ground (past the radius valley) is seen from its cloud tops: pale, warmed or frozen with its climate */
-const CLOUD = [[0.78, 0.83, 0.90], [0.66, 0.70, 0.74], [0.62, 0.64, 0.66], [0.66, 0.56, 0.42], [0.62, 0.36, 0.22]];
-const mixAlong = (table, c) => { const i = clamp(Math.floor(c), 0, 3), t = clamp(c - i, 0, 1), a = table[i], b = table[i + 1]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; };
-const groundColor = c => { const i = clamp(Math.floor(c), 0, 3), t = clamp(c - i, 0, 1), a = GROUND[i], b = GROUND[i + 1]; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; };
-
-export function createSurfaceView({ renderer }) {
+export function createSurfaceView({ renderer, mapNamed }) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, 1, 0.5, 6000); camera.rotation.order = 'YXZ';
   const view = { w: 1, h: 1, seed: 0 };
@@ -29,14 +22,14 @@ export function createSurfaceView({ renderer }) {
   const sunDir = Array.from({ length: MAX_SUNS }, () => new THREE.Vector3(0, -1, 0)), sunCol = Array.from({ length: MAX_SUNS }, () => new THREE.Color(0, 0, 0));
   const sunPow = new Float32Array(MAX_SUNS);
   const skyU = { uSunDir: { value: sunDir }, uSunCol: { value: sunCol }, uSunPow: { value: sunPow }, uAtmo: { value: new THREE.Color(0.3, 0.55, 1) }, uThin: { value: 1 },
-    uNight: { value: new THREE.Color(0.0016, 0.0035, 0.009) }, uDay: { value: 0 } };
+    uNight: { value: new THREE.Color(0.0016, 0.0035, 0.009) }, uDay: { value: 0 }, uAir: { value: 1 } };
   const skyMat = new THREE.ShaderMaterial({
     uniforms: skyU, side: THREE.BackSide, depthWrite: false, toneMapped: false,
     vertexShader: 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `
       #define MAX_SUNS ${MAX_SUNS}
       uniform vec3 uSunDir[MAX_SUNS]; uniform vec3 uSunCol[MAX_SUNS]; uniform float uSunPow[MAX_SUNS];
-      uniform vec3 uAtmo; uniform vec3 uNight; uniform float uDay; uniform float uThin;
+      uniform vec3 uAtmo; uniform vec3 uNight; uniform float uDay; uniform float uThin; uniform float uAir;
       varying vec3 vDir;
       void main() {
         vec3 v = normalize(vDir); float h = clamp(v.y, 0.0, 1.0), below = clamp(-v.y * 8.0, 0.0, 1.0);
@@ -54,8 +47,8 @@ export function createSurfaceView({ renderer }) {
           glow += s * uSunCol[i] * (0.35 * pow(max(mu, 0.0), 12.0) + 1.4 * pow(max(mu, 0.0), 220.0));
         }
         /* more suns make the sky brighter, never whiter: the colour is the suns' weighted mix, the brightness saturates */
-        vec3 day = wsum > 0.0 ? acc / wsum * (1.0 - exp(-1.7 * wsum)) * 1.2 : vec3(0.0);
-        vec3 col = night + day + glow;
+        vec3 day = wsum > 0.0 ? acc / wsum * (1.0 - exp(-1.7 * wsum)) * 1.2 * uAir : vec3(0.0);   // no air, no day sky: black around the sun
+        vec3 col = night + day + glow * (0.35 + 0.65 * uAir);
         col = mix(col, col * 0.55, below);
         col = col / (1.0 + 0.25 * max(col.r, max(col.g, col.b)));
         gl_FragColor = vec4(col, 1.0);
@@ -78,20 +71,44 @@ export function createSurfaceView({ renderer }) {
     const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.renderOrder = -9; return pts;
   })();
   sky.add(stars);
+  /* the galaxy behind the stars: a panorama fixed to the sky, leant as the Milky Way leans to a planet's orbit */
+  /* only its middle band is kept: toward the panorama's poles its stars are pinched into streaks, and the point stars
+   * already fill the rest of the sky */
+  const milky = new THREE.Mesh(new THREE.SphereGeometry(R_STARS + 40, 64, 32), new THREE.ShaderMaterial({
+    uniforms: { uMap: { value: mapNamed('v5/sky-milkyway') }, uOpacity: { value: 0 } }, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D uMap; uniform float uOpacity; varying vec2 vUv;
+      void main() { float band = 1.0 - smoothstep(0.32, 0.62, abs(vUv.y - 0.5) * 2.0); vec3 c = texture2D(uMap, vUv).rgb;
+        gl_FragColor = vec4(c * band * uOpacity, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  }));
+  milky.rotation.set(1.05, 0.4, 0.3); milky.renderOrder = -9.5; milky.frustumCulled = false; sky.add(milky);
 
   /* ---------------------------------------------------------------- the ground and two ridges of hills on the horizon */
-  const groundU = { uColor: { value: new THREE.Color() }, uLight: { value: 0 }, uHaze: { value: new THREE.Color() }, uGlow: { value: new THREE.Color(0, 0, 0) }, uFar: { value: 1 } };
-  const groundMat = (far) => new THREE.ShaderMaterial({
-    uniforms: { ...groundU, uFar: { value: far } }, toneMapped: false,
+  /* The ground is painted from repeating tiles (asset set v5): two of them blended by the climate, sampled at two scales
+   * so the repeat does not show, with the old colour as a tint. A glow mask lights the cracks of scorched ground. */
+  const tile = name => { const t = mapNamed(name); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t; };
+  const groundU = { uColor: { value: new THREE.Color() }, uLight: { value: 0 }, uHaze: { value: new THREE.Color() }, uGlow: { value: new THREE.Color(0, 0, 0) }, uFar: { value: 1 },
+    uTexA: { value: tile('v5/ground-grassland') }, uTexB: { value: tile('v5/ground-grassland') }, uMix: { value: 0 }, uGlowTex: { value: tile('v5/ground-scorched-glow') } };
+  const groundMat = (far, ridgeRadius = 0) => new THREE.ShaderMaterial({
+    uniforms: { ...groundU, uFar: { value: far }, uRidge: { value: ridgeRadius } }, toneMapped: false,
     vertexShader: 'varying vec3 vP; void main() { vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `
       uniform vec3 uColor; uniform float uLight; uniform vec3 uHaze; uniform vec3 uGlow; uniform float uFar; varying vec3 vP;
+      uniform sampler2D uTexA; uniform sampler2D uTexB; uniform float uMix; uniform sampler2D uGlowTex; uniform float uRidge;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
+      vec3 ground(vec2 uv) { return mix(texture2D(uTexA, uv).rgb, texture2D(uTexB, uv).rgb, uMix); }
       void main() {
-        float dist = length(vP.xz), grain = 0.75 + 0.5 * (0.6 * noise(vP.xz * 0.08) + 0.4 * noise(vP.xz * 0.6));
-        vec3 lit = uColor * grain * (0.03 + uLight) + uGlow * grain;
+        /* the ground is painted from above; a hill's face is painted along the skyline and up it, or a flat sample
+         * would run down it in stripes */
+        vec2 st = uRidge > 0.0 ? vec2(atan(vP.x, -vP.z) * uRidge, vP.y * 2.0) * 0.02 : vP.xz;
+        float dist = length(vP.xz), grain = 0.8 + 0.4 * noise(st * 0.05);
+        vec3 albedo = mix(ground(st * 0.16), ground(st * 0.023 + 0.37), 0.35) * uColor;
+        float cracks = texture2D(uGlowTex, st * 0.16).r;
+        vec3 lit = albedo * grain * (0.03 + uLight) + uGlow * cracks * 3.0;
         float haze = clamp(smoothstep(20.0, 1700.0, dist) * 0.85 + uFar * 0.25, 0.0, 1.0);
         vec3 col = mix(lit, uHaze, haze);
         gl_FragColor = vec4(col, 1.0);
@@ -99,6 +116,18 @@ export function createSurfaceView({ renderer }) {
       }`,
   });
   const ground = new THREE.Mesh(new THREE.CircleGeometry(2000, 96).rotateX(-Math.PI / 2).translate(0, -1.6, 0), groundMat(0)); scene.add(ground);
+  /* the tiles the climate walks through: snow, then green ground, dry, scorched; and the special grounds */
+  const LADDER = ['v5/ground-snow', 'v5/ground-grassland', 'v5/ground-grassland', 'v5/ground-desert', 'v5/ground-scorched'];
+  function groundTiles(f) {
+    if (f.gas) return ['v5/ground-cloudtops', 'v5/ground-cloudtops', 0];
+    if (f.surface === 'v5/moon-icy') return ['v5/ground-snow', 'v5/ground-snow', 0];
+    if (f.surface === 'v5/planet-barren') return ['v5/ground-regolith', 'v5/ground-regolith', 0];
+    if (f.surface === 'v5/planet-lava') return ['v5/ground-scorched', 'v5/ground-scorched', 0];
+    if (f.surface === 'moon-surface') return ['v5/ground-regolith', 'v5/ground-regolith', 0];
+    if (f.surface === 'v5/planet-arid' && f.climate > 1.5) return ['v5/ground-desert', f.climate > 3.5 ? 'v5/ground-scorched' : 'v5/ground-desert', Math.max(0, f.climate - 3.5) * 2];   // a desert world stays desert until it scorches
+    const c = clamp(f.climate, 0, 4), i = Math.min(3, Math.floor(c));
+    return [LADDER[i], LADDER[i + 1], c - i];
+  }
   const ridge = (radius, height, octave, far) => {
     const n = 720, pos = new Float32Array(n * 2 * 3), idx = [];
     for (let i = 0; i < n; i++) {
@@ -107,7 +136,7 @@ export function createSurfaceView({ renderer }) {
       const j = (i + 1) % n; idx.push(2 * i, 2 * j, 2 * i + 1, 2 * i + 1, 2 * j, 2 * j + 1);
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx);
-    const mesh = new THREE.Mesh(g, groundMat(far)); mesh.userData = { radius, height, octave, n }; return mesh;
+    const mesh = new THREE.Mesh(g, groundMat(far, radius)); mesh.userData = { radius, height, octave, n }; return mesh;
   };
   const ridges = [ridge(1750, 2.6, 3, 1), ridge(1150, 1.7, 5, 0.45)]; ridges.forEach(r => scene.add(r));
   /* each world has its own skyline, from a seed: low rolling hills with the odd taller rise */
@@ -182,7 +211,7 @@ export function createSurfaceView({ renderer }) {
 
     /* the air: thick and blue on a living world, thin and pale on a frozen one, orange haze on a burning one */
     skyU.uAtmo.value.setRGB(f.atmo.rgb[0], f.atmo.rgb[1], f.atmo.rgb[2], THREE.SRGBColorSpace).multiplyScalar(Math.min(1, f.atmo.strength));
-    skyU.uThin.value = clamp(f.atmo.strength, 0.3, 1.2);
+    skyU.uThin.value = clamp(f.atmo.strength, 0.3, 1.2); skyU.uAir.value = f.airless ? 0 : 1;
     let k = 0, groundLight = 0;
     seen.clear();
     for (const s of f.suns) {
@@ -206,12 +235,13 @@ export function createSurfaceView({ renderer }) {
       /* a sun drawn larger than it is (a point of light far away) keeps the light of its real disc */
       const shrink = Math.min(1, Math.pow(s.angR / discR, 2) * 30);
       u.uCore.value = (1.25 + 0.75 * Math.min(1, Math.pow(s.flux, 0.2))) * Math.max(0.25, shrink) * (1 - 0.55 * lowness) * (s.angR < discR ? 1 - 0.7 * f.daylight : 1);
-      u.uGlow.value = clamp(Math.pow(Math.max(s.flux, 0), 0.3), 0.04, 1.6) * (1 - 0.4 * lowness);
+      u.uGlow.value = clamp(Math.pow(Math.max(s.flux, 0), 0.3), 0.04, 1.6) * (1 - 0.4 * lowness) * (f.airless ? 0.3 : 1);   // no air to scatter it: only the eye's own glare
       it.mesh.visible = true;
     }
     for (let i = k; i < MAX_SUNS; i++) sunPow[i] = 0;
     skyU.uDay.value = f.daylight;
-    stars.material.opacity = Math.pow(1 - f.daylight, 2.2);
+    stars.material.opacity = f.airless ? 1 : Math.pow(1 - f.daylight, 2.2);   // with no air the stars shine by day
+    milky.material.uniforms.uOpacity.value = 1.1 * Math.pow(1 - f.daylight, 3);
 
     for (const w of f.worlds) {
       seen.add(w.id);
@@ -233,11 +263,13 @@ export function createSurfaceView({ renderer }) {
     for (const [id, it] of items) if (!seen.has(id)) { sky.remove(it.mesh); it.mesh.material.dispose(); items.delete(id); }
 
     /* the ground, lit by every sun above the horizon and by the sky itself; a burning world glows at night */
-    const gc = f.gas ? mixAlong(CLOUD, f.climate) : groundColor(f.climate);
     for (const r of ridges) r.visible = !f.gas;
-    groundU.uColor.value.setRGB(gc[0], gc[1], gc[2]);
+    const [ta, tb, mixT] = groundTiles(f);
+    groundU.uTexA.value = tile(ta); groundU.uTexB.value = tile(tb); groundU.uMix.value = mixT;
+    groundU.uColor.value.setRGB(1, 1, 1);   // the tiles carry the colour now
     groundU.uLight.value = groundLight + 0.25 * f.daylight;
-    const hz = horizonColor(f), glow = smoothstep(3.4, 4, f.climate) * 0.05;
+    const scorched = ta === 'v5/ground-scorched' || tb === 'v5/ground-scorched';   // only scorched ground has the cracks that glow
+    const hz = f.airless ? [0.004, 0.005, 0.008] : horizonColor(f), glow = scorched ? (f.surface === 'v5/planet-lava' ? 1 : smoothstep(3.4, 4, f.climate)) * 0.05 : 0;
     groundU.uHaze.value.setRGB(hz[0], hz[1], hz[2]);
     groundU.uGlow.value.setRGB(glow * 1.4, glow * 0.25, glow * 0.04);
   }
@@ -272,7 +304,7 @@ export function createSurfaceView({ renderer }) {
   const pxPerDeg = () => (view.h / 2) / Math.tan(camera.fov * DEG / 2) * DEG;
   function dispose() {
     for (const it of items.values()) it.mesh.material.dispose(); items.clear();
-    quad.dispose(); dome.geometry.dispose(); skyMat.dispose(); stars.geometry.dispose(); stars.material.dispose();
+    quad.dispose(); dome.geometry.dispose(); skyMat.dispose(); stars.geometry.dispose(); stars.material.dispose(); milky.geometry.dispose(); milky.material.dispose();
     for (const m of [ground, ...ridges]) { m.geometry.dispose(); m.material.dispose(); }
   }
   return { update, render, setSize, projectLocal, projectDir, frameDir, pxPerDeg, dispose, camera };

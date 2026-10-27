@@ -201,6 +201,15 @@ body.customizing.bottom-sheet .caption { display: none; }
 .hist-wrap { position: relative; }
 .hist-chart { display: block; width: 100%; height: 196px; touch-action: pan-y; cursor: crosshair; }
 .hist-tip { position: absolute; top: 4px; left: 0; max-width: 92%; padding: 5px 9px; border-radius: 9px; background: var(--primary-bg); color: var(--primary-fg); font: 500 .8125rem/1.35 var(--font-ui); pointer-events: none; box-shadow: 0 2px 10px var(--shadow, rgba(0,0,0,.2)); }
+.hist-scrub { margin: 2px 0 14px; }
+.hist-scrub input { width: 100%; height: 40px; }
+.hist-scrub-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.hist-scrub output { font: italic 400 .875rem/1.35 var(--font-sci); color: var(--ink-2); min-width: 0; }
+.hist-acts { display: flex; gap: 6px; }
+.hist-acts .chip { height: 40px; padding: 0 14px; border-color: var(--edge); }
+.hist-log li { padding: 0; }
+.hist-jump { display: flex; gap: 12px; width: 100%; padding: 8px 2px; text-align: left; border-radius: 8px; font: inherit; }
+.hist-jump:hover { background: var(--fill); }
 .hist-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 6px 2px 14px; font: italic 400 .8125rem/1.3 var(--font-sci); color: var(--ink-2); }
 .hist-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .hist-legend i { display: inline-block; width: 22px; height: 9px; border-radius: 3px; }
@@ -579,6 +588,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
           <button type="button" role="radio" data-v="long" aria-checked="false" tabindex="-1">Long</button>
         </div>
       </div>
+      <button class="switch-row" type="button" role="switch" data-view="warm" aria-checked="true"><span>Warm zone</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="trueSize" aria-checked="false"><span>True sizes</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="labels" aria-checked="false"><span>Body labels</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="arrows" aria-checked="false"><span>Velocity arrows while playing</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
@@ -613,6 +623,11 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
   </div>
   <div class="sheet-body hist" id="histBody" tabindex="0">
     <div class="hist-wrap"><canvas id="histCanvas" class="hist-chart" role="img" aria-label="Timeline of climate, eras and civilizations"></canvas><div id="histTip" class="hist-tip" hidden></div></div>
+    <div class="hist-scrub" id="histScrub" hidden>
+      <input id="histRange" type="range" min="0" max="1000" step="1" value="1000" aria-label="A moment in the planet’s history" aria-describedby="histAt">
+      <div class="hist-scrub-row"><output id="histAt" for="histRange"></output>
+        <span class="hist-acts"><button id="histGo" class="chip" type="button">Go back here</button><button id="histShare" class="chip" type="button">Copy link</button></span></div>
+    </div>
     <div class="hist-legend" id="histLegend"></div>
     <div class="hist-stats" id="histStats"></div>
     <ol class="hist-log" id="histLog"></ol>
@@ -1045,7 +1060,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
      NSSDC fact sheets; a body with none measured (Proxima b and d, all of Gliese 667) takes the mass–radius rule. */
   function homeSystem() {                 // JPL planetary fact sheets
     const S = sun(0, 1, { name: 'the Sun', label: 'S', tone: 'amber', lum: 1, radius: 1 });
-    const earth = around(S, world(1, M_EARTH, 'planet', { name: 'Earth', label: 'E', radius: 1, days: 365.25, follow: true }), 1.0, 0.0167, 0.4);
+    const earth = around(S, world(1, M_EARTH, 'planet', { name: 'Earth', label: 'E', radius: 1, days: 365.25, surface: 'earth', follow: true }), 1.0, 0.0167, 0.4);
     const jupiter = around(S, world(2, J, null, { name: 'Jupiter', label: 'J', radius: 10.973 }), 5.2044, 0.0489, 3.9);
     return toCOM([S, earth, jupiter]);
   }
@@ -1064,13 +1079,13 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
   }
   function kepler442System() {            // Torres et al. 2015
     const K = sun(0, 0.61, { name: 'Kepler-442', label: 'K', tone: 'amber', lum: 0.117, radius: 0.598 });
-    const b = around(K, world(1, 2.3 * M_EARTH, 'planet', { name: 'Kepler-442 b', label: 'b', radius: 1.34, follow: true }), 0.409, 0.04, 1.2);
+    const b = around(K, world(1, 2.3 * M_EARTH, 'planet', { name: 'Kepler-442 b', label: 'b', radius: 1.34, surface: 'arid', follow: true }), 0.409, 0.04, 1.2);
     return toCOM([K, b]);
   }
   function alphaCenSystem() {             // Pourbaix & Boffin 2016; Akeson et al. 2021. The planet is placed, not found.
     const A = sun(0, 1.0788, { name: 'Alpha Centauri A', tone: 'amber', lum: 1.5059, radius: 1.2175 }), Bb = sun(1, 0.9092, { name: 'Alpha Centauri B', tone: 'coral', lum: 0.4981, radius: 0.8591 });
     pairUp(A, Bb, 23.299, 0.5195, 2.4);
-    const p = around(Bb, world(2, M_EARTH, 'planet', { placed: true, follow: true }), 0.70, 0, 0.8);
+    const p = around(Bb, world(2, M_EARTH, 'planet', { placed: true, surface: 'ocean', follow: true }), 0.70, 0, 0.8);
     return toCOM([A, Bb, p]);
   }
   function kepler47System() {             // Orosz et al. 2012, 2019
@@ -1090,16 +1105,60 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     const c = around(C, world(4, 3.8 * M_EARTH, 'planet', { name: 'Gliese 667 Cc', label: 'c', locked: true, follow: true }), 0.125, 0.02, 0.4);
     return toCOM([A, Bb, C, b, c]);
   }
+  /* A world with a measured radius but no measured mass takes its mass from the radius, by Chen & Kipping's (2017) rules
+   * (the inverse of the sizes the page draws). */
+  const ROCKY_TOP = 1.008 * Math.pow(2.04, 0.279);   // the radius where the rocky branch meets the next
+  const massFromRadius = R => (R < ROCKY_TOP ? Math.pow(R / 1.008, 1 / 0.279) : 2.04 * Math.pow(R / ROCKY_TOP, 1 / 0.589)) * M_EARTH;
+  function toi700System() {               // Gilbert et al. 2023 (AJ 165, 10). No masses are measured: each comes from its radius.
+    const T = sun(0, 0.415, { name: 'TOI-700', label: 'T', tone: 'coral', lum: 0.0229, radius: 0.421 });
+    const P = [['b', 0.914, 0.0677, 0.075, 0.6], ['c', 2.60, 0.0929, 0.068, 2.9], ['e', 0.953, 0.1340, 0.059, 4.4], ['d', 1.073, 0.1633, 0.042, 1.7]];
+    const list = [T];
+    P.forEach(([l, r, a, e, phi], k) => list.push(around(T, world(k + 1, massFromRadius(r), 'planet', { name: 'TOI-700 ' + l, label: l, radius: r, locked: true, follow: l === 'd' }), a, e, phi)));
+    return toCOM(list);
+  }
+  function teegardenSystem() {            // Dreizler et al. 2024 (A&A 684, A117). Minimum masses; nothing transits, so no radii.
+    const T = sun(0, 0.097, { name: 'Teegarden’s Star', label: 'T', tone: 'coral', lum: 7.22e-4, radius: 0.120 });
+    const P = [['b', 1.16, 0.0259, 0.03, 0.9], ['c', 1.05, 0.0455, 0.04, 3.6], ['d', 0.82, 0.0791, 0.07, 5.4]];
+    const list = [T];
+    P.forEach(([l, m, a, e, phi], k) => list.push(around(T, world(k + 1, m * M_EARTH, 'planet', { name: 'Teegarden’s Star ' + l, label: l, locked: true, follow: l === 'b' }), a, e, phi)));
+    return toCOM(list);
+  }
+  function toi1338System() {              // Kostov et al. 2020; Standing et al. 2023 (BEBOP-1). The followed world is placed, not found.
+    const A = sun(0, 1.127, { name: 'TOI-1338 A', tone: 'amber', lum: 2.13, radius: 1.331 }), Bb = sun(1, 0.313, { name: 'TOI-1338 B', tone: 'coral', lum: 0.011, radius: 0.309 });
+    pairUp(A, Bb, 0.1321, 0.1555, 0.3);
+    const both = origin(A.m + Bb.m);
+    const b = around(both, world(2, 33 * M_EARTH, 'planet', { name: 'TOI-1338 b', label: 'b', radius: 6.85 }), 0.4607, 0.088, 2.2);
+    const c = around(both, world(3, 65.2 * M_EARTH, 'planet', { name: 'TOI-1338 c', label: 'c' }), 0.794, 0, 4.4);
+    const p = around(both, world(4, M_EARTH, 'planet', { placed: true, follow: true }), 1.46, 0, 0.9);
+    return toCOM([A, Bb, b, c, p]);
+  }
+  function ltt1445System() {              // Winters et al. 2019, 2022; Lavie et al. 2023; Brown et al. 2022. d is a candidate.
+    const A = sun(0, 0.257, { name: 'LTT 1445 A', tone: 'coral', lum: 0.00796, radius: 0.265 });
+    const Bb = sun(1, 0.215, { name: 'LTT 1445 B', tone: 'coral', lum: 0.0060 }), C = sun(2, 0.161, { name: 'LTT 1445 C', tone: 'coral', lum: 0.0037 });
+    pairUp(Bb, C, 8.1, 0.50, 1.9);
+    /* the B–C pair circles A as one body, 34 AU off (the separation seen now; the orbit itself is not known, so it is
+     * taken as circular) */
+    const pair = around(origin(A.m), { m: Bb.m + C.m, x: 0, y: 0, vx: 0, vy: 0 }, 34, 0, 3.3);
+    for (const q of [Bb, C]) { q.x += pair.x; q.y += pair.y; q.vx += pair.vx; q.vy += pair.vy; }
+    const c = around(A, world(3, 1.54 * M_EARTH, 'planet', { name: 'LTT 1445 Ac', label: 'c', radius: 1.15, locked: true }), 0.0266, 0, 0.8);
+    const b = around(A, world(4, 2.87 * M_EARTH, 'planet', { name: 'LTT 1445 Ab', label: 'b', radius: 1.305, locked: true }), 0.0381, 0, 3.0);
+    const d = around(A, world(5, 2.72 * M_EARTH, 'planet', { name: 'LTT 1445 Ad', label: 'd', locked: true, follow: true }), 0.104, 0, 5.2);
+    return toCOM([A, Bb, C, c, b, d]);
+  }
   const PRESETS = [
     { id: 'home', name: 'Sun, Earth and Jupiter', tag: 'Home, with Jupiter tugging', group: 'One sun', rate: 3, trail: 2.5, period: 6.283, make: homeSystem },
     { id: 'trappist', name: 'TRAPPIST-1', tag: 'Seven worlds round a red dwarf', rate: 0.05, trail: 0.12, period: 0.105, make: trappistSystem },
     { id: 'proxima', name: 'Proxima Centauri', tag: 'The nearest star, the nearest world', rate: 0.1, trail: 0.25, period: 0.193, make: proximaSystem },
     { id: 'kepler442', name: 'Kepler-442', tag: 'A quiet world in the warm zone', rate: 0.6, trail: 0.7, period: 1.93, make: kepler442System },
+    { id: 'toi700', name: 'TOI-700', tag: 'Two Earth-sized worlds in the warm zone', rate: 0.2, trail: 0.75, period: 0.644, make: toi700System },
+    { id: 'teegarden', name: 'Teegarden’s Star', tag: 'Earth’s sunlight from a tiny star', rate: 0.04, trail: 0.2, period: 0.0844, make: teegardenSystem },
     { id: 'alphacen', name: 'Alpha Centauri', tag: 'A placed world under the nearer sun', group: 'Two suns', rate: 3, trail: 2.5, period: 3.86, make: alphaCenSystem },
     { id: 'kepler47', name: 'Kepler-47', tag: 'Three planets circling two suns', rate: 0.3, trail: 1.3, period: 5.21, make: kepler47System },
+    { id: 'toi1338', name: 'TOI-1338', tag: 'A placed world round a 15-day pair', rate: 0.5, trail: 3, period: 9.24, make: toi1338System },
     { id: 'trisolaris', name: 'Trisolaris', tag: 'A world under three suns', group: 'Three suns', rate: 6, trail: 12, period: 6.3, skies: true,
       make: (sky) => trisolarisBodies(sky || TRISOLARIS_DEFAULT) },
     { id: 'gj667', name: 'Gliese 667', tag: 'A real world with three suns in its sky', rate: 0.15, trail: 0.6, period: 0.484, frame: [2, 3, 4], frameSize: 0.3, make: gliese667System },
+    { id: 'ltt1445', name: 'LTT 1445', tag: 'Three red dwarfs and a warm candidate', rate: 0.12, trail: 0.5, period: 0.418, frame: [0, 3, 4, 5], frameSize: 0.25, make: ltt1445System },
     { id: 'eight', name: 'Figure-eight', tag: 'Stable dance', group: 'Classics', rate: 1.6, trail: 2.3, wide: true, period: 6.32591398251509,
       make: () => line(0.347116887991313, 0.532724945454650) },
     { id: 'moth', name: 'Moth', tag: 'Rare repeating pattern', rate: 2.4, trail: 7.6, period: 14.8943051750219,
@@ -1181,6 +1240,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
+<script src="src/surfaces.js"></script>
 <script src="src/body-renderer.js"></script>
 <script src="src/event-effects.js"></script>
 <script>
@@ -1260,6 +1320,34 @@ const COPY = {
       'Kepler-47, 3,400 light-years away, has a Sun-like star of 0.96 Suns and a red dwarf of 0.34 Suns whirling 0.08 AU apart. Three planets circle the pair: b in 49 days, d in 187, and c in 303 days at 0.96 AU, inside the habitable zone. c is 4.7 times Earth’s width, so it is probably wrapped in thick gas; if anything lives here it may be on a moon of it.',
       'A planet circling two stars is only stable beyond two to four times the stars’ separation, depending on their masses and orbit. Here that limit is about 0.2 AU; b sits at 0.29, just outside it. Numbers: Orosz et al. 2012 and 2019, NASA Exoplanet Archive.',
     ] },
+  toi700: {
+    caption: 'A quiet red dwarf with four known worlds. The outer two, e and d, are in the warm zone; d gets 86 percent of Earth’s sunlight.',
+    note: [
+      'TOI-700, about 100 light-years away, is a red dwarf with two fifths of the Sun’s mass and two percent of its light. The TESS space telescope found its four planets as they passed in front of it: three close to Earth’s size, and c, a little over two and a half times as wide.',
+      'Only their sizes are measured. Each mass here comes from its size by Chen & Kipping’s rules, the same rules the page uses for any size it does not know. All four are close enough to be tidally locked, and the star is unusually calm for a red dwarf.',
+      'Numbers: Gilbert et al. 2023.',
+    ] },
+  teegarden: {
+    caption: 'One of the smallest stars known, and a world that gets almost exactly Earth’s sunlight, circling it in under five days.',
+    note: [
+      'Teegarden’s Star, 12.5 light-years away, has a tenth of the Sun’s mass and less than a thousandth of its light. Its planet b orbits at a fortieth of Earth’s distance, where that faint light adds up to 108 percent of what Earth receives.',
+      'The three planets were found from the wobble they give the star. That gives only their least possible masses, and since none passes in front of the star, their sizes are unknown: the page takes them from the masses. All three are probably tidally locked.',
+      'Numbers: Dreizler et al. 2024.',
+    ] },
+  toi1338: {
+    caption: 'Two suns that circle each other every 15 days, with two real giant planets around both. The world followed is placed, not found, where the light is Earth-like.',
+    note: [
+      'TOI-1338, about 1,300 light-years away, is a Sun-like star and a red dwarf in a 14.6-day orbit. A student working with TESS found its first planet, b, a world nearly seven times Earth’s width; c, heavier still, was found later from the stars’ wobble.',
+      'No world the size of Earth is known in any binary close enough for its suns to be seen moving. So a world of Earth’s mass is placed here, on a circle 1.46 AU out where the two suns together give Earth’s sunlight, well outside the zone a pair this close makes unstable.',
+      'b’s mass is the photodynamical estimate, with a wide margin; c’s is a least possible mass. Numbers: Kostov et al. 2020, Standing et al. 2023.',
+    ] },
+  ltt1445: {
+    caption: 'Three red dwarfs 22 light-years away. The world followed, d, circles the brightest at a tenth of Earth’s distance; B and C dance round each other 34 AU off.',
+    note: [
+      'LTT 1445 is one of the nearest triple stars: A, with two planets that pass in front of it, and a close pair, B and C, circling each other about every 36 years. A third planet, d, is a candidate, seen only in the wobble of A, with 73 percent of Earth’s sunlight.',
+      'From d, B and C would be two bright orange stars swinging round each other over decades, adding a hundred-thousandth of A’s warmth. Their orbit about A is not known, only today’s separation, so a circle at 34 AU is assumed here.',
+      'd may yet turn out to be a stellar signal rather than a planet. Numbers: Winters et al. 2019 and 2022, Lavie et al. 2023, Brown et al. 2022.',
+    ] },
   gj667: {
     caption: 'A real world with three suns in its sky. One warms it; the other two are bright stars 230 AU away, and the view follows the near sun.',
     note: [
@@ -1328,7 +1416,7 @@ const COPY = {
     ] },
 };
 const THUMB_T = { eight: 6.33, moth: 14.9, triangle: 8.27, moon: 6.3, suns: 12.7, trisolaris: 75, sling: 9, swap: 13, pyth: 21,
-  home: 75, trappist: 0.35, proxima: 0.6, kepler442: 2.0, alphacen: 503, kepler47: 5.3, gj667: 1.0 };   // home: one turn of Jupiter; alphacen: one turn of the pair
+  home: 75, trappist: 0.35, proxima: 0.6, kepler442: 2.0, alphacen: 503, kepler47: 5.3, gj667: 1.0, toi700: 0.7, teegarden: 0.5, toi1338: 9.3, ltt1445: 0.45 };   // home: one turn of Jupiter; alphacen: one turn of the pair
 
 const SCI = {
   why: ['Why three is hard', [
@@ -1429,7 +1517,7 @@ const ui = {
   speed: clamp(store.get('speed2', 0) | 0, 0, SPEEDS.length - 1),      // slow by default: the stories read better that way
   /* 3D is the default view. `chosen` marks a view the person picked themselves; a saved 'flat' without it is only the old
    * default written back with another setting, so it gives way to 3D. */
-  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: '3d', drift: true, chosen: false, trueSize: false }, store.get('view', {})),
+  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: '3d', drift: true, chosen: false, trueSize: false, warm: true }, store.get('view', {})),
   tab: 'bodies',
   sheet: null,
 };
@@ -1474,7 +1562,7 @@ function setViewMode(mode, opts) {
   const slow = setTimeout(() => { if (sky3d.loading && !sky3d.api) say('load3d', 'Loading the 3D view…', true, { now: true, hint: true }); }, 250);
   sky3d.loading = import(new URL('src/sky3d.js', location.href).href).then(m => {
     sky3d.api = m.createSky3D({ canvas: dom.sky3d, onContextLost: contextLost, onContextRestored: contextRestored,
-      onTextureError: () => say('tex3d', 'Some surface pictures did not load, so the spheres show their colours only.', false) });
+      onTextureError: () => say('tex3d', 'Some surface pictures did not load, so a few surfaces are drawn plain.', false) });
     sky3d.api.setTheme(theme); sky3d.api.rig.drift = !!ui.view.drift;
     if (ui.view.mode === '3d') enterThree();
     refreshViewPane();
@@ -1594,6 +1682,10 @@ function fluxOn(list, p) {                             // sunlight reaching p, i
   return { F, shares };
 }
 const eqTemp = F => CLIMATE.T0 * Math.pow(F, 0.25);
+/* The warm zone: where a world would receive the light that the climate here calls calm, 245 to 310 K, which is
+ * between 0.52 and 1.34 times Earth's sunlight. It is the app's own band, so the overlay and the civilizations agree. */
+const WARM_F = [Math.pow(CLIMATE.CALM_LO / CLIMATE.T0, 4), Math.pow(CLIMATE.CALM_HI / CLIMATE.T0, 4)];
+const warmSuns = list => list.filter(s => isStar(s.m) && !isWorld(s)).map(s => ({ x: s.x, y: s.y, L: lumOf(s.m, s.meta) }));
 const fmtC = T => signed(Math.round(T - 273.15), 0) + ' °C';
 const fmtYearsPlain = t => { const y = t / TU_YEAR; return y < 1 ? 'less than a year' : y < 1.5 ? 'a year' : Math.round(y) + ' years'; };
 function initCivs() {
@@ -1608,6 +1700,14 @@ const cloneCiv = c => (c ? Object.assign({}, c, { hist: c.hist.slice(), log: c.l
 function chronicle(kind, text) {           // the planet's history, for the timeline sheet
   const c = world.civ; if (!c) return;
   c.events.push({ t: world.sys ? world.sys.t : world.t, kind, text });
+}
+/* The followed world leaving its suns for good ends the story. Noticed on the climate's own clock (see climateStep), so
+ * it happens at the same simulated moment however fast the run is played, and when it is replayed. */
+function exileWorld(list, fb) {
+  const c = world.civ; c.exiled = true;
+  const com = centerOfMass(list.filter(q => q !== fb)), v = Math.hypot(fb.vx - com[2], fb.vy - com[3]) * V_KMS;
+  const etext = 'The planet is leaving its ' + sunsWord(sunCount(list)) + ' for good, at ' + sig(v, 2) + ' km/s into the dark.' + (c.alive ? ' Civilization ' + c.n + ' will be the last.' : c.n ? ' No civilization will follow.' : '');
+  say('exile', etext, false, { urgent: true }); chronicle('end', etext);
 }
 function climateStep(S) {                               // after every accepted step of the main system
   const c = world.civ; if (!c || c.over) return;
@@ -1628,6 +1728,7 @@ function climateStep(S) {                               // after every accepted 
     c.histNext = S.t + CLIMATE.HIST_DT;
     if (c.logK++ % CLIMATE.LOG_EVERY === 0) c.log.push(S.t, c.T, c.era === 'stable' ? 1 : 0, c.alive ? c.n : 0);
     watchHost(S, i);
+    if (!c.exiled) { const bs = S.bodies(); if ([...escaping(bs, world.R0)].includes(c.id)) exileWorld(bs, bs[i]); }
   }
   const era = S.t - c.rough > CLIMATE.ERA ? 'stable' : 'chaotic';
   if (era !== c.era) { c.era = era; c.eraPending = era; c.eraAt = S.t; }   // the label flips at once; the caption waits to see if it lasts
@@ -1703,12 +1804,15 @@ function eraChanged(S, i) {
     else if (share > 0.1) text = 'A Chaotic Era begins. ' + (suns === 2 ? 'The other sun is closing in, and its light now reaches the planet too.' : 'The other suns are closing in, and their light now reaches the planet too.');
     else text = 'A Chaotic Era begins. ' + (suns === 1 ? 'The other worlds are stirring the planet’s orbit' : 'The suns are stirring the planet’s orbit') + ', and the seasons no longer repeat.';
   }
-  /* an era caption still waiting to be shown means the sky flipped back before anyone saw it: drop both */
+  /* The chronicle records every era the climate settles into, from the simulation alone, so the history is the same at
+   * any playback speed and when a moment is replayed. The caption is another matter: one still waiting to be shown
+   * means the sky flipped back before anyone saw it, so both are dropped. */
+  chronicle(c.era === 'stable' ? 'stable' : 'chaotic', text);
   const waiting = insight.queue.some(q => q.group === 'era');
   insight.queue = insight.queue.filter(q => q.group !== 'era');
   if (waiting || text === c.eraSaid) return;
   c.eraSaid = text;
-  say('era', text, true, { group: 'era' }); chronicle(c.era === 'stable' ? 'stable' : 'chaotic', text);
+  say('era', text, true, { group: 'era' });
   slowFor(1500, 0.5);
 }
 function endCiv(S, i, band) {                           // band: 1 hot, -1 cold
@@ -1793,6 +1897,7 @@ function setCaption(text) {             // immediate: replaces whatever is showi
 }
 function say(key, text, repeatable, opts) {   // queued: gives the previous line time to be read
   if (!repeatable) { if (insight.said.has(key)) return; insight.said.add(key); }
+  if (world.ff) return;                    // replaying to a chosen moment: what happened on the way has already been told
   opts = opts || {};
   if (opts.replaces) insight.queue = insight.queue.filter(q => q.group !== opts.replaces);
   if (opts.now) {                          // a direct answer to something the person just did: no waiting
@@ -1840,6 +1945,7 @@ function clearRunState() {
   throttle.want = throttle.got = 0; throttle.ratio = 1; throttle.on = false;
 }
 function resetRun(opts) {
+  world.ff = null;                         // a new run ends any replay under way (jumpTo sets its own after this)
   opts = opts || {};
   clearRunState();
   world.sys = new System(cloneBodies(world.ic));
@@ -1878,9 +1984,13 @@ function loadPreset(i, opts) {
 }
 function restart() { resetRun({}); }
 function setHash(h) { try { history.replaceState(null, '', location.pathname + location.search + (h ? '#' + h : '')); } catch (e) { /* not every host allows it */ } }
-function skyFromHash() { const m = /[#&]sky=([^&]+)/.exec(location.hash || ''); if (!m) return null; try { return skyForSeed(decodeURIComponent(m[1])); } catch (e) { return null; } }
+function skyFromHash() {
+  const m = /[#&]sky=([^&]+)/.exec(location.hash || ''); if (!m) return null;
+  try { const seed = decodeURIComponent(m[1]); return seed === 'default' ? SKY_LIST[0] : skyForSeed(seed); } catch (e) { return null; }
+}
 
 function setPlaying(on) {
+  if (world.ff) { stopJump(); return; }    // the play button stops a replay where it is
   on = !!on;
   if (world.playing === on) return;
   world.playing = on;
@@ -1891,6 +2001,7 @@ function setPlaying(on) {
 /* ------------------------------------------------------------------ slow motion: playback eases down while something worth seeing happens */
 const drama = { until: 0, factor: 1, cur: 1, shown: 1 };
 function slowFor(ms, f) {
+  if (world.ff) return;
   const now = performance.now();
   drama.factor = now < drama.until ? Math.min(drama.factor, f) : f;
   drama.until = Math.max(drama.until, now + ms);
@@ -1940,7 +2051,7 @@ function onMainEvents() {
   const S = world.sys;
   for (; world.evSeen < S.events.length; world.evSeen++) {
     const ev = S.events[world.evSeen], c = world.civ;
-    if (eventEffects) eventEffects.add(ev, { before: ev.before || world.cur, after: ev.after || S.bodies() });
+    if (eventEffects && !world.ff) eventEffects.add(ev, { before: ev.before || world.cur, after: ev.after || S.bodies() });
     bodiesDirty = true;
     if (ev.type === 'rip') {
       const p = bodyById(world.cur, ev.id), by = bodyById(world.cur, ev.by);
@@ -1990,12 +2101,8 @@ function watch() {
     if (n >= 3 && world.escaped.size >= n) say('breakup', 'All ' + (n === 3 ? 'three' : 'of them') + ' are flying apart. There was more energy of motion here than gravity could hold.', false, U);
     for (const e of fresh) {
       const fb = bodyById(b, e); if (!fb) continue;
-      if (c && fb.id === c.id) {
-        c.exiled = true;
-        const com = centerOfMass(b.filter(q => q !== fb)), v = Math.hypot(fb.vx - com[2], fb.vy - com[3]) * V_KMS;
-        const etext = 'The planet is leaving its ' + sunsWord(sunCount(b)) + ' for good, at ' + sig(v, 2) + ' km/s into the dark.' + (c.alive ? ' Civilization ' + c.n + ' will be the last.' : c.n ? ' No civilization will follow.' : '');
-        say('exile', etext, false, U); chronicle('end', etext);
-      } else if (fb.kind === 'moon') say('escape' + e, 'The moon has been pulled away for good.', false, U);
+      if (c && fb.id === c.id) { if (!c.exiled) exileWorld(b, fb); }   // usually already noticed by the climate's own clock
+      else if (fb.kind === 'moon') say('escape' + e, 'The moon has been pulled away for good.', false, U);
       else if (world.escaped.size >= n && n >= 3) continue;
       else if (stock && COPY[id].escape) say('escape', COPY[id].escape, false, U);
       else say('escape' + e, capName(fb) + ' is leaving for good. It is now moving too fast for the others’ gravity to pull it back.', false, U);
@@ -2032,6 +2139,7 @@ function pushUndo() {
 function undo() {
   const s = world.undo.pop();
   if (!s) return;
+  world.ff = null;
   world.playing = false;
   world.pi = s.pi; world.preset = PRESETS[s.pi]; world.sky = s.sky || SKY_LIST[0]; world.edited = s.edited; world.ic = s.ic; world.sys = s.sys;
   world.t = s.t; restoreTrails(world.trails, s.trails);
@@ -2213,7 +2321,7 @@ const dom = {};
 ['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'captionLive', 'announce', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
   'context', 'undoBtn', 'resetBtn', 'skyBtn', 'skyPill', 'skiesSheet', 'skyGrid', 'seedForm', 'seedInput', 'planetBtn', 'eraOut', 'eraLbl', 'eraStrip', 'historySheet', 'histBody', 'histCanvas', 'histTip', 'histLegend', 'histStats', 'histLog', 'fitBtn', 'transport', 'restartBtn', 'playBtn', 'playIcon', 'slowerBtn', 'fasterBtn', 'speedOut', 'scrim',
   'presetSheet', 'presetGrid', 'customSheet', 'scienceSheet', 'sciBody', 'sheetPlay', 'sheetPlayIcon', 'sheetRestart', 'bodyChips', 'massRange', 'massVal',
-  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'standBtn', 'compassBtn', 'compassIc', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields', 'gridRow'].forEach(id => { dom[id] = $(id); });
+  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'histScrub', 'histRange', 'histAt', 'histGo', 'histShare', 'standBtn', 'compassBtn', 'compassIc', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields', 'gridRow'].forEach(id => { dom[id] = $(id); });
 dom.readouts = document.querySelector('.readouts');
 const ctx = dom.sky.getContext('2d');
 const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -2269,6 +2377,20 @@ function updateVisuals(dt, simulationDt = 0) {
   if (eventEffects) eventEffects.update(dt, { playing: running, reducedMotion });
 }
 const TONE_NAMES = ['amber', 'cyan', 'coral'];
+/* the surface map a body wears (src/surfaces.js, shared with the 3D view), chosen once from the light it gets when it
+ * first appears, so a world does not change its face as it swings nearer and farther */
+const surfaceNames = new Map();
+function surfaceName(b, list) {
+  if (!window.Surfaces) return null;
+  const key = world.pi + ':' + b.id + ':' + b.m.toPrecision(4) + ':' + (b.meta && b.meta.name || '');
+  let name = surfaceNames.get(key);
+  if (name === undefined) {
+    name = window.Surfaces.surfaceOf(b, fluxOn(list, b).F, radiusEarth(b)).name;
+    if (surfaceNames.size > 200) surfaceNames.clear();
+    surfaceNames.set(key, name);
+  }
+  return name;
+}
 const toneOfBody = b => (b.meta && b.meta.tone) || TONE_NAMES[b.id % 3];   // a real sun names its tone; the classics colour by id
 const toneIdx = b => TONE_NAMES.indexOf(toneOfBody(b));
 function colorOf(b, list) {
@@ -2470,6 +2592,31 @@ function sayTrueSize() {
 function bodyR(b) { return ui.view.trueSize ? Math.max(1.2, trueRadiusAU(b) * scaleNow()) : drawnRadius(b); }
 const inkA = a => rgba(theme.ink, a);
 
+/* The warm zone on the flat chart: the light is summed from every sun on a coarse grid of the screen, and the band
+ * drawn back through a small canvas scaled up smoothly, so its edges are soft and two suns' zones merge as they do. */
+const warmCanvas = document.createElement('canvas'), warmCtx = warmCanvas.getContext('2d');
+function drawWarmZone() {
+  const suns = warmSuns(world.cur); if (!suns.length) return;
+  const cell = Math.max(5, Math.ceil(Math.max(view.w, view.h) / 260)), W = Math.ceil(view.w / cell) + 1, H = Math.ceil(view.h / cell) + 1;   // a coarse grid, smoothed
+  if (!drawWarmZone.img || warmCanvas.width !== W || warmCanvas.height !== H) { warmCanvas.width = W; warmCanvas.height = H; drawWarmZone.img = warmCtx.createImageData(W, H); }
+  const img = drawWarmZone.img, d = img.data; d.fill(0);
+  const col = theme.worldMild, lo = Math.log(WARM_F[0]), hi = Math.log(WARM_F[1]), soft = 0.16;
+  const Flo = WARM_F[0] * Math.exp(-soft), Fhi = WARM_F[1] * Math.exp(soft);
+  const a0 = theme.additive ? 0.16 : 0.13, sm = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+  for (let j = 0; j < H; j++) {
+    const y = wy(j * cell);
+    for (let i = 0; i < W; i++) {
+      const x = wx(i * cell); let F = 0;
+      for (const q of suns) F += q.L / Math.max(1e-12, (x - q.x) ** 2 + (y - q.y) ** 2);
+      if (F < Flo || F > Fhi) continue;     // most of the screen is far from the band: no logarithm needed
+      const lf = Math.log(F), a = sm(lo - soft, lo + soft, lf) * (1 - sm(hi - soft, hi + soft, lf));
+      if (a <= 0.002) continue;
+      const o = 4 * (j * W + i); d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = Math.round(255 * a0 * a);
+    }
+  }
+  warmCtx.putImageData(img, 0, 0);
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(warmCanvas, 0, 0, W * cell, H * cell); ctx.restore();
+}
 function drawGrid() {
   const s = cam.scale, w = view.w, h = view.h;
   let step = Math.pow(10, Math.floor(Math.log10(84 / s)));
@@ -2623,8 +2770,9 @@ function drawBodies(paused) {
     ctx.fillStyle = rgba(col, 1); ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI); ctx.fill();
     if (bodyRenderer && d.r >= 2.2) {
       const common = { x: d.x, y: d.y, r: d.r, theme: theme.additive ? 'dark' : 'light', bodyId: q.id, time: visuals.time, spinTime: q.meta && q.meta.locked ? lockedSpin(q, b) : visuals.spinTime, quality: perf.quality, reducedMotion };
-      if (isStar(q.m) && !isWorld(q)) bodyRenderer.drawStar(ctx, { ...common, id: toneOfBody(q) });
-      else bodyRenderer.drawWorld(ctx, { ...common, climate: visuals.climates.get(q.id) ?? climateTexture(tempOf(q, b)), moon: q.kind === 'moon', ripped: q.ripped && q.kind !== 'moon', detail: theme.additive ? 0.72 : 0.62 });
+      const map = surfaceName(q, b);
+      if (isStar(q.m) && !isWorld(q)) bodyRenderer.drawStar(ctx, { ...common, id: toneOfBody(q), map });
+      else bodyRenderer.drawWorld(ctx, { ...common, map, climate: visuals.climates.get(q.id) ?? climateTexture(tempOf(q, b)), moon: q.kind === 'moon', ripped: q.ripped && q.kind !== 'moon', detail: theme.additive ? 0.72 : 0.62 });
     }
     ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
     ctx.strokeStyle = rgba(theme.field, 0.55); ctx.lineWidth = 1; ctx.stroke();
@@ -2794,6 +2942,7 @@ function drawGround() {
 /* The sky's story: where everything is on arrival, then each sunrise and sunset, never more than one line in eight
  * seconds so the civilizations' own captions keep their place. */
 function tellGround(info, w) {
+  if (world.ff) return;                    // replaying to a moment: tell the sky once we are there
   const real = info.suns.filter(isRealSun), sunOf = s => bodyById(world.cur, s.id), now = performance.now();
   if (ground.say) {
     ground.say = false; ground.up = new Set(real.filter(s => s.alt > 0).map(s => s.id));
@@ -2857,7 +3006,7 @@ function render(now, dt) {
       const deg = Math.round(sky3d.api.rig.cur.theta * 180 / Math.PI);
       if (deg !== view.compassDeg) { view.compassDeg = deg; dom.compassIc.style.transform = 'rotate(' + deg + 'deg)'; }
     }
-    sky3d.api.render({ bodies: world.cur, drawn, trueSize: !!ui.view.trueSize, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
+    sky3d.api.render({ bodies: world.cur, drawn, trueSize: !!ui.view.trueSize, warm: ui.view.warm ? { suns: warmSuns(world.cur), F: WARM_F, rgb: theme.worldMild } : null, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
       climates: visuals.climates, spinTime: visuals.spinTime, quality: perf.quality, colorOf: b => colorOf(b) });
     if (standing) { drawGround(); return; }  // from the ground the chart's furniture means nothing: a compass and the sky's names instead
     if (paused && ui.view.forecast) drawForecast();
@@ -2868,6 +3017,7 @@ function render(now, dt) {
     drawEdgeMarks(); drawDragLabel(); drawPlacing();
     return;
   }
+  if (ui.view.warm) drawWarmZone();
   if (ui.view.grid) drawGrid();
   if (paused && ui.view.forecast) drawForecast();
   if (ui.view.trails !== 'off') drawTrails();
@@ -2992,8 +3142,8 @@ function drawBodyChip(cv, b) {
   // Reuse the game's cached surfaces. Inspector thumbnails stay still while
   // their climate follows the world, without adding another animation loop.
   const spec = { x: 20, y: 20, r: 16, bodyId: 'chip-' + b.id, time: 0, spinTime: 0, reducedMotion: true, theme: theme.additive ? 'dark' : 'light' };
-  if (star) bodyRenderer.drawStar(k, { ...spec, id: toneOfBody(b) });
-  else bodyRenderer.drawWorld(k, { ...spec, climate, moon, ripped: b.ripped && !moon, detail: theme.additive ? .72 : .62 });
+  if (star) bodyRenderer.drawStar(k, { ...spec, id: toneOfBody(b), map: surfaceName(b, world.cur) });
+  else bodyRenderer.drawWorld(k, { ...spec, map: surfaceName(b, world.cur), climate, moon, ripped: b.ripped && !moon, detail: theme.additive ? .72 : .62 });
 }
 function refreshBodies(force) {
   bodiesDirty = false;
@@ -3212,6 +3362,7 @@ function tempAt(L, t) {                     // the logged temperature nearest to
 }
 function renderHistory(fresh) {
   const c = world.civ;
+  dom.histScrub.hidden = !c || c.log.length < 8;
   if (!c || c.log.length < 8) { dom.histCanvas.hidden = true; dom.histLegend.innerHTML = ''; dom.histStats.innerHTML = '<p class="hist-empty">Give the planet a year or two. Its history is drawn here as it happens.</p>'; dom.histLog.innerHTML = ''; return; }
   dom.histCanvas.hidden = false;
   requestAnimationFrame(() => drawHistory(c));
@@ -3236,10 +3387,69 @@ function renderHistory(fresh) {
   const logSig = c.events.length + ':' + theme.stamp;
   if (dom.histLog.dataset.sig !== logSig) {                 // rebuilt only when something new has happened
     dom.histLog.dataset.sig = logSig;
-    dom.histLog.innerHTML = c.events.length ? c.events.slice().reverse().map(e => '<li><i style="background:' + rgba(evColor(e.kind), 1) + '"></i><b>Year ' + Math.round(e.t / TU_YEAR) + '</b><span>' + e.text + '</span></li>').join('')
+    dom.histLog.innerHTML = c.events.length ? c.events.slice().reverse().map(e => '<li><button class="hist-jump" type="button" data-t="' + e.t + '" title="Go back to just before this"><i style="background:' + rgba(evColor(e.kind), 1) + '"></i><b>Year ' + Math.round(e.t / TU_YEAR) + '</b><span>' + e.text + '</span></button></li>').join('')
       : '<li><span class="hist-empty">Nothing has happened yet.</span></li>';
   }
-  if (fresh) dom.histBody.scrollTop = 0;
+  if (fresh) { dom.histBody.scrollTop = 0; dom.histRange.value = '1000'; histView.scrubT = null; }
+  dom.histShare.disabled = world.edited; dom.histShare.title = world.edited ? 'An edited setup cannot be shared yet' : 'Copy a link that opens this sky at this moment';
+  scrubLabel();
+}
+/* ---- the scrubber: a moment of the history, shown on the chart, to go back to or to share */
+const scrubT = () => { const c = world.civ; return c ? (+dom.histRange.value / 1000) * histEnd(c) : 0; };
+function scrubLabel() {
+  const c = world.civ; if (!c || c.log.length < 8) return;
+  const t = scrubT(), T1 = histEnd(c), L = c.log, era = eraRuns(L, T1).find(r => t >= r[0] && t <= r[1]), civ = civRuns(L, T1).find(r => t >= r[0] && t <= r[1]);
+  const now = t >= world.t - 1e-9;          // after the planet is lost the chart ends before the present
+  dom.histAt.textContent = (now ? 'Now, ' : '') + fmtYears(t) + ' · ' + fmtC(tempAt(L, t)).trim() + (era ? ' · ' + (era[2] ? 'Stable' : 'Chaotic') + ' Era' : '') + (civ ? ' · Civilization ' + civ[2] : '');
+  dom.histRange.setAttribute('aria-valuetext', dom.histAt.textContent);
+  dom.histGo.disabled = now;
+}
+function onScrub() {
+  const c = world.civ; if (!c) return;
+  scrubLabel(); histView.scrubT = scrubT();
+  histView.hoverX = histView.padL + (histView.W - histView.padL - histView.padR) * histView.scrubT / Math.max(histView.T1, 1e-9); drawHistory(c);
+}
+
+/* ---- going back. The run is replayed from its start to the chosen moment, quickly and silently: the physics and the
+ * climate advance step by step whatever the frame rate, so the replay meets the same history and goes on to the same
+ * future. Captions, slow motion and effects wait while it runs; the chronicle still records. */
+const LINK_YEARS = 2000;                    // a link never asks for a replay longer than this
+function jumpTo(T, why) {
+  T = Math.max(0, T);
+  if (place.on) exitPlacing(false);
+  clearTimeout(insight.timer); insight.queue = [];   // lines about the run being left behind are not told after it
+  if (T < world.t - 1e-12) { pushUndo(); resetRun({ keepCamera: true, keepCaption: true }); }   // Undo brings back the moment you left
+  world.playing = false;
+  world.ff = { target: T, from: world.t, shown: 0, why: why || '' };
+  showCaption('Going to ' + fmtYears(T) + '… Press pause to stop on the way.', 'hold'); refreshChrome(); invalidate();
+}
+function stopJump() {                      // pause, or Escape, during a replay: stay where it has got to
+  if (!world.ff) return;
+  world.ff = null; world.cur = sampleBodies(world.sys, world.t); watch(); refreshCivOut(); refreshChrome(); computeForecast(false);
+  insight.hint = false; say('jumpStopped', 'Stopped on the way, at ' + fmtYears(world.t) + '.', true, { now: true });
+}
+function stepJump() {
+  const J = world.ff, got = advance(J.target, 30);
+  world.t = got;
+  const now = performance.now();
+  if (now - J.shown > 300) { J.shown = now; showCaption('Going to ' + fmtYears(J.target) + '… ' + Math.round(100 * (got - J.from) / Math.max(J.target - J.from, 1e-9)) + '%. Press pause to stop on the way.', 'hold'); }
+  if (got < J.target - 1e-12) return;
+  world.ff = null; world.playing = false; world.cur = sampleBodies(world.sys, world.t);
+  watch(); cam.cut = true; if (sky3d.api) sky3d.api.rig.cutNext();
+  refreshCivOut(); refreshChrome(); computeForecast(false);
+  insight.hint = false;
+  say('jumped', (J.why ? J.why + ' ' : '') + 'Now at ' + fmtYears(world.t) + '. Press play to watch what follows.', true, { now: true });
+  announce('Now at ' + fmtYears(world.t));
+}
+const firstSentence = text => { const m = /^.*?[.!?](?=\s|$)/.exec(text); return m ? m[0] : text; };
+/* a link that opens this setup, this sky and this moment, in the view being used */
+function shareMoment(t) {
+  const view = onSurface() ? 'surface' : ui.view.mode, sky = world.preset.skies ? '&sky=' + encodeURIComponent(world.sky.seed || 'default') : '';
+  /* five decimals of a year is five minutes: fine enough for a world whose year is a few days */
+  const url = location.origin + location.pathname + '?view=' + view + '#setup=' + world.preset.id + sky + '&t=' + trimZeros((t / TU_YEAR).toFixed(5));
+  const done = () => { say('linked', 'Link copied. It opens ' + world.preset.name + ' at ' + fmtYears(t) + '.', true, { now: true }); announce('Link copied'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => window.prompt('Copy this link', url));
+  else window.prompt('Copy this link', url);
 }
 const histView = { c: null, W: 0, T1: 1, padL: 4, padR: 4, rows: null, eras: [], civs: [], hoverX: null };
 function drawHistory(c) {
@@ -3345,6 +3555,7 @@ function renderScience() {
   h += fold(SCI.real[0], '<ul>'
     + '<li><strong>Real.</strong> Newton’s law of gravity, with every body pulling on every other. Close passes are not softened or fudged. Masses are in Suns, distances in AU (1 AU is the distance from the Earth to the Sun, about 150 million km), and the clock runs in years.</li>'
     + '<li><strong>Flat.</strong> Everything moves in one plane. Real systems are three-dimensional, but the mathematics and the chaos are the same.</li>'
+    + '<li><strong>The warm zone.</strong> The green band marks where a world would receive between 0.52 and 1.34 times Earth’s sunlight, summed from every sun: the light at which this page’s climate is calm (245 to 310 K) and civilizations can last. It is the page’s own simple rule, not the astronomers’ habitable zone, which also weighs atmospheres and is usually drawn a little farther out.</li>'
     + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them, but in their real order and rough proportion: each size is the real radius (published, or from the mass) compressed to its 0.3 power, so the Sun is drawn four times as wide as Earth rather than 109. <em>True sizes</em> in Customize shows the real thing. When two come close on screen, their discs shrink rather than hide each other; in 3D a sphere instead stops growing as it nears a neighbour, each taking a share of the gap in proportion to its size.</li>'
     + '<li><strong>On the surface.</strong> Standing on a world, the sky is computed from the simulation: each sun’s direction, its brightness, and its real width from its published radius (or, where none is measured, from its mass). Bodies too small to see are drawn as points. The observer stands at 30° north. Earth keeps its own day; a world whose spin is not known is given a day a thirtieth of its year, and a tidally locked world has no day, so its sun stands still. While you stand on a world, time slows so that a day lasts about eight seconds at 1×. The air and the ground are drawn to match the climate, not computed.</li>'
     + '<li><strong>Collisions.</strong> Each star is treated as a compact ball. A 1-Sun body is about 15,000 km in radius here, roughly twice the size of a white dwarf star and nearly 50 times smaller than the real Sun. Two bodies that touch merge into one. Mass and momentum are kept, and the energy of the crash is assumed to leave as heat. There is no relativity and no loss of mass.</li>'
@@ -3542,6 +3753,14 @@ function wire() {
   dom.planetBtn.addEventListener('click', togglePlacing);
   dom.eraOut.addEventListener('click', () => toggleSheet('history'));
   ['pointermove', 'pointerdown', 'pointerleave', 'pointercancel'].forEach(t => dom.histCanvas.addEventListener(t, histHover));
+  dom.histRange.addEventListener('input', onScrub);
+  dom.histGo.addEventListener('click', () => { const t = scrubT(); closeSheet(); jumpTo(t); });
+  dom.histShare.addEventListener('click', () => { const t = scrubT(); shareMoment(t >= histEnd(world.civ) - 1e-9 ? world.t : t); });
+  dom.histLog.addEventListener('click', e => {
+    const b = e.target.closest('.hist-jump'); if (!b) return;
+    const t = +b.dataset.t, back = Math.min(0.5 * TU_YEAR, t);   // a little before it, to watch it happen
+    closeSheet(); jumpTo(t - back, back > 0 ? 'Half a year before: ' + firstSentence(b.querySelector('span').textContent) : '');
+  });
   dom.fitBtn.addEventListener('click', () => setAuto(true));
   dom.presetBtn.addEventListener('click', () => toggleSheet('preset'));
   dom.customBtn.addEventListener('click', () => toggleSheet('custom'));
@@ -3587,6 +3806,7 @@ function wire() {
     const k = b.dataset.view; ui.view[k] = !ui.view[k]; store.set('view', ui.view); refreshViewPane(); invalidate();
     if (k === 'drift' && sky3d.api) sky3d.api.rig.drift = !!ui.view.drift;
     if (k === 'trueSize') { markLayout(); sayTrueSize(); }
+    if (k === 'warm' && ui.view.warm) say('warm', 'The green band is the warm zone: where a world would get between half and one and a third times Earth’s sunlight, the range in which civilizations here can last. With more than one sun it stretches and moves.', true, { now: true });
     if (k === 'com' && ui.view.com) say('com', 'The cross marks the center of mass, the balance point of the whole group. Nothing the bodies do to one another can move it off its straight path.', true, { now: true });
   }));
   [dom.trailSeg, dom.appearanceSeg, dom.modeSeg, dom.cameraSeg, dom.angleSeg].forEach(seg => seg.addEventListener('keydown', e => {
@@ -3599,7 +3819,7 @@ function wire() {
   window.addEventListener('keydown', e => {
     if (e.defaultPrevented) return;
     const k = e.key;
-    if (k === 'Escape') { if (ui.sheet) { closeSheet(); e.preventDefault(); } else if (place.on) { exitPlacing(true); e.preventDefault(); } else if (onSurface()) { leaveSurface(); e.preventDefault(); } return; }
+    if (k === 'Escape') { if (world.ff && !ui.sheet) { stopJump(); e.preventDefault(); return; } if (ui.sheet) { closeSheet(); e.preventDefault(); } else if (place.on) { exitPlacing(true); e.preventDefault(); } else if (onSurface()) { leaveSurface(); e.preventDefault(); } return; }
     const t = e.target, typing = t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'range'));
     const modal = ui.sheet && SHEETS[ui.sheet].modal;
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k.toLowerCase() === 'z') { if (typing || modal) return; undo(); e.preventDefault(); return; }
@@ -3682,14 +3902,15 @@ function frame(now) {
   const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
   if (document.hidden) return;
   if (layoutDirty) measure();
-  if (!world.playing && now > dirtyUntil && !drag.mode && !(sky3d.on && sky3d.api.dirty)) return;      // nothing is changing: leave the last picture up
+  if (!world.playing && !world.ff && now > dirtyUntil && !drag.mode && !(sky3d.on && sky3d.api.dirty)) return;      // nothing is changing: leave the last picture up
   tick(now, dt);
 }
 /* simulated time per second at 1×: the setup's own pace, or on the ground the world's day pace (never faster) */
 function playRate() { const r = onSurface() ? sky3d.api.surfaceRate() : null; return r ? Math.min(world.preset.rate, r) : world.preset.rate; }
 function tick(now, dt) {                   // one frame's worth of simulation and drawing
   const previousTime = world.t;
-  if (world.playing) {
+  if (world.ff) stepJump();
+  else if (world.playing) {
     perf.ema += (dt - perf.ema) * 0.05;
     if (perf.ema > 0.026) { if (++perf.bad > 150 && perf.quality < 2) { perf.quality++; perf.bad = 0; } } else if (perf.bad > 0) perf.bad--;
     drama.cur += (dramaTarget(now) - drama.cur) * (1 - Math.exp(-dt * 5));
@@ -3718,12 +3939,15 @@ function init() {
   else if (askedView === 'surface') { ui.view.mode = '3d'; sky3d.wantSurface = true; }   // a link straight to the ground
   else if (!ui.view.chosen) ui.view.mode = '3d';
   refreshViewPane();
-  const saved = PRESETS.findIndex(p => p.id === store.get('preset', 'trisolaris'));
+  const hashSetup = /[#&]setup=([\w-]+)/.exec(location.hash || ''), hashT = /[#&]t=([\d.]+)/.exec(location.hash || '');
+  const linkedPreset = hashSetup ? PRESETS.findIndex(p => p.id === hashSetup[1]) : -1;
+  const saved = linkedPreset >= 0 ? linkedPreset : PRESETS.findIndex(p => p.id === store.get('preset', 'trisolaris'));
   const linked = skyFromHash(), seed = store.get('sky', 'default');
   const sky = linked || (seed === 'default' ? SKY_LIST[0] : skyForSeed(seed));
-  loadPreset(linked ? PRESETS.findIndex(p => p.skies) : (saved >= 0 ? saved : 0), { snap: true, sky });
+  loadPreset(linked && linkedPreset < 0 ? PRESETS.findIndex(p => p.skies) : (saved >= 0 ? saved : 0), { snap: true, sky });
+  if (hashT && linkedPreset >= 0 && +hashT[1] > 0) jumpTo(Math.min(+hashT[1], LINK_YEARS) * TU_YEAR, 'From the link.');   // a shared moment: replay to it
   if (linked && linked.key !== 'default') say('sky', 'Sky ‘' + linked.name + '’, from the link. ' + skyParams(linked.c), true, { now: true });
-  world.playing = !reducedMotion;
+  if (!world.ff) world.playing = !reducedMotion;   // a link's moment arrives paused, as a jump from the history does
   refreshChrome(); measure();
   if (bodyRenderer) bodyRenderer.ready.then(() => { chipArtReady = true; refreshBodies(); invalidate(); }).catch(() => invalidate());
   if (ui.view.mode === '3d') setViewMode('3d', { silent: true, quiet: !askedView && !ui.view.chosen });

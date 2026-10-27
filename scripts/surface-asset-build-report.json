@@ -1,0 +1,228 @@
+{
+  "tool": "sharp 0.35.4",
+  "masters": "sources are relative to the folder holding the asset set (output/, kept outside the repository)",
+  "note": "Resizing and compression of the asset set v5 masters. The masters stay outside the repository; lighting, climate, seams and blending are the renderer's.",
+  "assets": [
+    {
+      "name": "planet-terran-b",
+      "source": "body-assets-v5/images/planet-terran-b.png",
+      "sourceSha256": "7a55ec070bc1f837ffde4a0ffd8f862124a0a6dffbc0aeab183db736a8a5dff9",
+      "sourceBytes": 17952115,
+      "file": "public/assets/bodies/v5/planet-terran-b.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 115128,
+      "sha256": "445b140e5584d38a256e1b319f0b9a0fea7067b84ff32703faefb59bbb22e6bd"
+    },
+    {
+      "name": "planet-ocean",
+      "source": "body-assets-v5/images/planet-ocean.png",
+      "sourceSha256": "b9c64330bb74c226a05ed8ff63bec85cf66582f53579bfd51caf3c664adb37ba",
+      "sourceBytes": 15118297,
+      "file": "public/assets/bodies/v5/planet-ocean.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 83420,
+      "sha256": "dd01fbf578d6a5c66aaf69cef16abe4ab7c6c6652f9d3b780e65662654a2aa9a"
+    },
+    {
+      "name": "planet-arid",
+      "source": "body-assets-v5/images/planet-arid.png",
+      "sourceSha256": "ba299a69416de26a5d65f7d271b8672de394b4dd2a255e6bcc12f709931bcd78",
+      "sourceBytes": 19180965,
+      "file": "public/assets/bodies/v5/planet-arid.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 95850,
+      "sha256": "5f7e858ff551698ebf60df16e6d46b263a79e3378d8fb4108fa9094398e05b6c"
+    },
+    {
+      "name": "planet-eyeball",
+      "source": "body-assets-v5/images/planet-eyeball.png",
+      "sourceSha256": "7acf8158211216f67beac18c9bd5de7896e628aa5117e3f063c6f30bec558174",
+      "sourceBytes": 17147577,
+      "file": "public/assets/bodies/v5/planet-eyeball.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 86010,
+      "sha256": "fd804ed7ea0700b98f0a8ecfa9f41cc25650cdcd30d4fdb60cf8f99f114064eb"
+    },
+    {
+      "name": "planet-barren",
+      "source": "body-assets-v5/images/planet-barren.png",
+      "sourceSha256": "9f8ec38fb56ca2a7aa33f4a8501a856d7bb6d2cab516372fa17150de4574304f",
+      "sourceBytes": 17456959,
+      "file": "public/assets/bodies/v5/planet-barren.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 98580,
+      "sha256": "4570355aca63a5aa8dc770098ba24e661e0e3cff7ea82ca2947fa6450f2b7156"
+    },
+    {
+      "name": "planet-lava",
+      "source": "body-assets-v5/images/planet-lava.png",
+      "sourceSha256": "d91f28de3f24193816bdf94ee3073457155d2bff3c667b4400a4529880032305",
+      "sourceBytes": 14607349,
+      "file": "public/assets/bodies/v5/planet-lava.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 73130,
+      "sha256": "e0cf88af7f46d570e3e2ef77dd549b81c742a04f291e8af0b6a301bb2b95c8f5"
+    },
+    {
+      "name": "planet-lava-glow",
+      "source": "body-assets-v5/images/planet-lava-glow.png",
+      "sourceSha256": "ea2fafc6ba72b274f8ce77d99822b84583a45bf9b9279f5cadd1d49c1d580432",
+      "sourceBytes": 942979,
+      "file": "public/assets/bodies/v5/planet-lava-glow.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 76912,
+      "sha256": "9c0e5b4c5c4146ea1e1e5e521d472d419cd3ce345d7730323b7b4fec31ace9d3"
+    },
+    {
+      "name": "giant-jovian",
+      "source": "body-assets-v5/images/giant-jovian.png",
+      "sourceSha256": "5fec6d9d47200119d02f1c13cd9dde021e8f175256e9108e608d5d7291c100c1",
+      "sourceBytes": 13363743,
+      "file": "public/assets/bodies/v5/giant-jovian.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 50364,
+      "sha256": "78acd64e86ba0d17efc595251840c7d9ff9b7ead7973dbe14a5369a322bdaab5"
+    },
+    {
+      "name": "giant-neptunian",
+      "source": "body-assets-v5/images/giant-neptunian.png",
+      "sourceSha256": "10f4583b062a970b70687b50fd262af6d7d0747cd727c524493fad4bc606fb4f",
+      "sourceBytes": 7347814,
+      "file": "public/assets/bodies/v5/giant-neptunian.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 21918,
+      "sha256": "7bbbcccfae1530df58a15eb8c766cdc6ecaad5213a8974366d6b40dd127fe9bb"
+    },
+    {
+      "name": "star-m-dwarf",
+      "source": "body-assets-v5/images/star-m-dwarf.png",
+      "sourceSha256": "86d868e366890703b5982bea458a6feff03f74b418ae9896b3b8d9e74436ed8d",
+      "sourceBytes": 5680984,
+      "file": "public/assets/bodies/v5/star-m-dwarf.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 89090,
+      "sha256": "429bf1a9c63970bc70d8b7cc717a2b885d479c3e32b4b82dc183c68f027f2006"
+    },
+    {
+      "name": "star-k-dwarf",
+      "source": "body-assets-v5/images/star-k-dwarf.png",
+      "sourceSha256": "4af39595c8722e713593be69e1fb5a7cb77def1260e6a3fd48f037b57bb0313b",
+      "sourceBytes": 5560065,
+      "file": "public/assets/bodies/v5/star-k-dwarf.webp",
+      "width": 1024,
+      "height": 512,
+      "sizeBytes": 91964,
+      "sha256": "e8f718fc6193ecca8148c5fdc1305fe64b10e9a9238a709210db7bbf16d00ab5"
+    },
+    {
+      "name": "moon-icy",
+      "source": "body-assets-v5/images/moon-icy.png",
+      "sourceSha256": "c83825ad9f3991c864712344b9f8e5b99524796fd4a8f1e664c8d764c5e7c0c5",
+      "sourceBytes": 4276625,
+      "file": "public/assets/bodies/v5/moon-icy.webp",
+      "width": 512,
+      "height": 256,
+      "sizeBytes": 26148,
+      "sha256": "c365c61b79c4a046daf8b3efdc46deddb3f4adc11fa6ecf2d57e29bb1b1156f6"
+    },
+    {
+      "name": "ground-grassland",
+      "source": "body-assets-v5/images/ground-grassland.png",
+      "sourceSha256": "fc9637d7f542dfee0a48edaa09c51c3f55c30e4b6f2591a11b9e530b0697924b",
+      "sourceBytes": 10961770,
+      "file": "public/assets/bodies/v5/ground-grassland.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 85042,
+      "sha256": "fceaee1ca50c61d222a53738ef2206c10a2bf6d5de19cb9c0f87062d06304a60"
+    },
+    {
+      "name": "ground-snow",
+      "source": "body-assets-v5/images/ground-snow.png",
+      "sourceSha256": "02ebbd5cb5b312f6a597c3a58dcd97f3df98974b66a71a82acf3048e5a719f1d",
+      "sourceBytes": 7756474,
+      "file": "public/assets/bodies/v5/ground-snow.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 36298,
+      "sha256": "c8e7f1da27760c58997e38666d9dbb1fd2d4a41acf1aa85d97089d3d9f4aeb0b"
+    },
+    {
+      "name": "ground-desert",
+      "source": "body-assets-v5/images/ground-desert.png",
+      "sourceSha256": "3755cbd6bb3731711892de869f2c829ad385938a22f20184218b715cb2b67336",
+      "sourceBytes": 10006107,
+      "file": "public/assets/bodies/v5/ground-desert.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 52896,
+      "sha256": "f471a4707d3cc5c7e06aa2f4b89900857c3612c9aacdb64f0468fc8aa2f1c669"
+    },
+    {
+      "name": "ground-scorched",
+      "source": "body-assets-v5/images/ground-scorched.png",
+      "sourceSha256": "27deb92d52cbc7b22afbcd07dd8c2239f4252ab0b05b9283f7b3908553e5834b",
+      "sourceBytes": 10250792,
+      "file": "public/assets/bodies/v5/ground-scorched.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 78896,
+      "sha256": "018dfb2bc4d49ba4b8831fd702bce3074d8062123a9d2f27b798f59edd491b4f"
+    },
+    {
+      "name": "ground-scorched-glow",
+      "source": "body-assets-v5/images/ground-scorched-glow.png",
+      "sourceSha256": "53d7f063774dc2b8d19545e4e15706099cbf24ced2eaf7469471be497a58fe22",
+      "sourceBytes": 878249,
+      "file": "public/assets/bodies/v5/ground-scorched-glow.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 31920,
+      "sha256": "6978f49be0b17d19308e28783e6aee36d414c7a92773f96ac854d4873a6687fc"
+    },
+    {
+      "name": "ground-regolith",
+      "source": "body-assets-v5/images/ground-regolith.png",
+      "sourceSha256": "7021d903ea71bd94de8cb103c0094ed94eb0f93cfa3de78cf228f1492db9b361",
+      "sourceBytes": 10134392,
+      "file": "public/assets/bodies/v5/ground-regolith.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 89220,
+      "sha256": "28cc35a3d8ab119e97a4a55f593623d9f8fba2769c9b0e47d7d8e973454e3ccc"
+    },
+    {
+      "name": "ground-cloudtops",
+      "source": "body-assets-v5/images/ground-cloudtops.png",
+      "sourceSha256": "3b9fbf1736dcb81be16b7ee5def026a9b67d798b605acdbc4a57cf83eb49feda",
+      "sourceBytes": 4348542,
+      "file": "public/assets/bodies/v5/ground-cloudtops.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 14834,
+      "sha256": "d5a1cb125282655d2d92675125e62d56b0719d5071ee20e5315f62445a751b5e"
+    },
+    {
+      "name": "sky-milkyway",
+      "source": "body-assets-v5/images/sky-milkyway.png",
+      "sourceSha256": "b26e1a0e19aa10458a6c35fb8c3e00c7292ef331d0c20c1ab847ae4a6533a2b2",
+      "sourceBytes": 9299772,
+      "file": "public/assets/bodies/v5/sky-milkyway.webp",
+      "width": 2048,
+      "height": 1024,
+      "sizeBytes": 95598,
+      "sha256": "399839a94ddf62c18d8bbb1c279267179ea908bee295335e44fdeb94b1cd1a71"
+    }
+  ],
+  "totalBytes": 1393218
+}
