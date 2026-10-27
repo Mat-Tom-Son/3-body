@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { LineSegments2 } from '../vendor/LineSegments2.js';
 import { LineSegmentsGeometry } from '../vendor/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/LineMaterial.js';
-import { CameraRig, cameraOffset, gridStep, climateTint, atmosphereTint, spinAngle, SPIN_PERIODS, STAR_PHASE, toneOf, clamp, TAU } from './sky3d-model.js';
+import { CameraRig, cameraOffset, climateTint, atmosphereTint, spinAngle, SPIN_PERIODS, STAR_PHASE, toneOf, clamp, TAU } from './sky3d-model.js';
 
 const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200, LUM = m => Math.pow(m, 3.5);
 const SIZE_GAIN = { star: 1, planet: 1.3, moon: 1.25, giant: 1.15 };   // worlds are a few pixels across; a sphere needs a little more than a disc to read
@@ -40,8 +40,6 @@ export function createSky3D({ canvas }) {
     const pts = new THREE.Points(g, m); pts.frustumCulled = false; return pts;
   })();
   scene.add(starfield);
-  const grid = { group: new THREE.Group(), step: 0, size: 0, lines: null };
-  scene.add(grid.group);
 
   /* ---------------------------------------------------------------- textures, geometry, shaders */
   const loader = new THREE.TextureLoader();
@@ -161,28 +159,6 @@ export function createSky3D({ canvas }) {
     a.geometry.instanceCount = seg; pos.needsUpdate = true; col.needsUpdate = true;
   }
 
-  /* ---------------------------------------------------------------- grid: the flat page's crosses, laid on the plane */
-  function updateGrid(on) {
-    grid.group.visible = on;
-    if (!on) return;
-    const step = gridStep(pxPerWorld), size = 4 / pxPerWorld;
-    if (step !== grid.step || Math.abs(Math.log(size / grid.size)) > 0.15) {
-      grid.step = step; grid.size = size;
-      const N = clamp(Math.ceil(view.w / pxPerWorld / step) + 2, 4, 44), count = (2 * N + 1) ** 2, p = new Float32Array(count * 12);
-      let o = 0;
-      for (let i = -N; i <= N; i++) for (let j = -N; j <= N; j++) {
-        const x = i * step, z = j * step;
-        p[o++] = x - size; p[o++] = 0; p[o++] = z; p[o++] = x + size; p[o++] = 0; p[o++] = z;
-        p[o++] = x; p[o++] = 0; p[o++] = z - size; p[o++] = x; p[o++] = 0; p[o++] = z + size;
-      }
-      if (grid.lines) { grid.group.remove(grid.lines); grid.lines.geometry.dispose(); }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-      grid.lines = new THREE.LineSegments(g, grid.material); grid.lines.frustumCulled = false; grid.group.add(grid.lines);
-    }
-    grid.group.position.set(Math.round(rig.cur.tx / step) * step, 0, Math.round(rig.cur.tz / step) * step);
-  }
-  grid.material = new THREE.LineBasicMaterial({ color: 0x8894ad, transparent: true, opacity: 0.5, depthWrite: false });
-
   /* ---------------------------------------------------------------- camera */
   const camPos = new THREE.Vector3(), target = new THREE.Vector3(), forward = new THREE.Vector3(), tmp = new THREE.Vector3();
   function applyCamera() {
@@ -238,7 +214,7 @@ export function createSky3D({ canvas }) {
   /* ---------------------------------------------------------------- drawing */
   const lightDir = new THREE.Vector3();
   function render(frame) {
-    const { bodies, drawn, trails, trailMode, tNow, tMin, climates, spinTime, quality, colorOf, grid: gridOn } = frame;
+    const { bodies, drawn, trails, trailMode, tNow, tMin, climates, spinTime, quality, colorOf } = frame;
     const live = new Set();
     let brightest = null, bright = 0;
     for (const b of bodies) if (kindOf(b) === 'star') { const L = LUM(b.m); if (L > bright) { bright = L; brightest = b; } }
@@ -280,7 +256,6 @@ export function createSky3D({ canvas }) {
       } else a.line.visible = false;
     }
     for (const id of [...actors.keys()]) if (!live.has(id)) dropActor(id);
-    updateGrid(!!gridOn);
     renderer.render(scene, camera);
     if (dirty > 0) dirty--;
   }
@@ -301,7 +276,6 @@ export function createSky3D({ canvas }) {
     starfield.visible = additive;
     ambient.intensity = additive ? 0.22 : 0.9; ambient.color.copy(additive ? new THREE.Color(0x8fa0cc) : toColor(t.field));
     hemi.intensity = additive ? 0.18 : 0.35;
-    grid.material.color.copy(toColor(t.ink).lerp(bg, 0.55)); grid.material.opacity = additive ? 0.5 : 0.7;
     for (const a of actors.values()) if (a.atmo) a.atmo.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
     invalidate();
   }

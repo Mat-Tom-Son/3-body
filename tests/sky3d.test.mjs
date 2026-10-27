@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { build } from '../scripts/build.mjs';
 import { createAppServer } from '../server.mjs';
-import { CameraRig, basisOf, cameraOffset, fitDistance, gridStep, climateTint, atmosphereTint, spinAngle, toneOf, SPIN_PERIODS } from '../src/sky3d-model.js';
+import { CameraRig, basisOf, cameraOffset, fitDistance, climateTint, atmosphereTint, spinAngle, toneOf, SPIN_PERIODS } from '../src/sky3d-model.js';
 
 const near = (a, b, tolerance = 1e-9) => assert.ok(Math.abs(a - b) <= tolerance * Math.max(1, Math.abs(a), Math.abs(b)), `${a} != ${b}`);
 const fit = { tanH: 0.6, tanV: 0.4, playing: true };
@@ -18,7 +18,8 @@ test('the main page loads the 3D module on demand through an import map, and kee
   assert.match(html, /id="sky3d" aria-hidden="true" hidden/);
   assert.match(html, /id="modeSeg"[\s\S]*data-v="flat"[\s\S]*data-v="3d"/);
   assert.match(html, /mode: 'flat', drift: true/, 'the flat chart stays the default');
-  assert.match(html, /f = sky3d\.on \? 1 : clamp\(0\.46 \* d/, 'spheres never shrink for an on-screen neighbour, which would pulse in a tilted view');
+  assert.match(html, /if \(sky3d\.on\) f = n > 1 \? clamp\(Math\.max\(bodyR\(b\[i\]\), 0\.12 \* nearW/, 'spheres are capped by real neighbour distance, not on-screen distance, so they never pulse or outgrow their orbits');
+  assert.doesNotMatch(html, /grid: ui\.view\.grid \}\)/, 'the 3D sky has no grid');
   for (const name of ['drawGrid', 'drawTrails', 'drawBodies', 'drawBodyMarks', 'drawBodyOverlays', 'fitPoints', 'setViewMode', 'followBody']) assert.match(html, new RegExp(`function ${name}\\(`), `${name} must exist`);
 });
 
@@ -121,8 +122,7 @@ test('camera geometry: offsets, basis vectors and fitting agree', () => {
   near(fitDistance([[1, 0, -4]], basis), 0.5, 1e-12);
 });
 
-test('grid, tints, spin and tones follow the flat page', () => {
-  assert.equal(gridStep(120), 1); assert.equal(gridStep(10), 10); assert.equal(gridStep(2000), 0.05);
+test('tints, spin and tones follow the flat page', () => {
   assert.equal(climateTint(2).amount, 0);
   assert.ok(climateTint(0).amount > 0.5 && climateTint(4).amount > 0.5);
   assert.ok(atmosphereTint(4).rgb[0] > atmosphereTint(2).rgb[0], 'a burning world glows warmer');

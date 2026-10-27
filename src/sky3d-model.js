@@ -12,13 +12,6 @@ export const spinAngle = (spinTime, period) => TAU * (spinTime / period - Math.f
 export const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const ease = (dt, rate) => 1 - Math.exp(-dt * rate);
 
-/* The flat page's grid spacing rule: the step, in world units, whose cells are at least 84 px wide at `pxPerWorld`. */
-export function gridStep(pxPerWorld) {
-  let step = Math.pow(10, Math.floor(Math.log10(84 / pxPerWorld)));
-  for (const f of [1, 2, 5, 10]) if (f * step * pxPerWorld >= 84) { step *= f; break; }
-  return step;
-}
-
 /* How strongly the planet's map is washed toward ice or scorched earth, from the flat page's climate index (0 frozen,
  * 1 thawing, 2 temperate, 3 warming, 4 hot), which that page already smooths for presentation. */
 const ICE = [0.86, 0.92, 1], DUST = [0.96, 0.72, 0.42], EMBER = [0.78, 0.33, 0.16];

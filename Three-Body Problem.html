@@ -553,7 +553,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       <button class="switch-row" type="button" role="switch" data-view="slow" aria-checked="true"><span>Slow down for events</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="forecast" aria-checked="true"><span>Path ahead while paused</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="com" aria-checked="false"><span>Center of mass</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
-      <button class="switch-row" type="button" role="switch" data-view="grid" aria-checked="true"><span>Grid</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
+      <button class="switch-row" type="button" role="switch" data-view="grid" id="gridRow" aria-checked="true"><span>Grid</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
     </div>
 
   </div>
@@ -1955,7 +1955,7 @@ const dom = {};
 ['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
   'context', 'undoBtn', 'resetBtn', 'skyBtn', 'skyPill', 'skiesSheet', 'skyGrid', 'seedForm', 'seedInput', 'planetBtn', 'eraOut', 'eraLbl', 'eraStrip', 'historySheet', 'histBody', 'histCanvas', 'histTip', 'histLegend', 'histStats', 'histLog', 'fitBtn', 'transport', 'restartBtn', 'playBtn', 'playIcon', 'slowerBtn', 'fasterBtn', 'speedOut', 'scrim',
   'presetSheet', 'presetGrid', 'customSheet', 'scienceSheet', 'sciBody', 'sheetPlay', 'sheetPlayIcon', 'sheetRestart', 'bodyChips', 'massRange', 'massVal',
-  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields'].forEach(id => { dom[id] = $(id); });
+  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields', 'gridRow'].forEach(id => { dom[id] = $(id); });
 dom.topLeft = document.querySelector('.top-left'); dom.topRight = document.querySelector('.top-right');
 const ctx = dom.sky.getContext('2d');
 const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -2268,13 +2268,17 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
     let X, Y, S = 0;
     if (sky3d.on) { const p = sky3d.api.project(b[i].x, b[i].y); X = p.x; Y = p.y; S = p.s; } else { X = sx(b[i].x); Y = sy(b[i].y); }
     const R = bodyR(b[i]) * gain;
-    let f = 1, nx = 0, ny = 0, best = Infinity;
+    let f = 1, nx = 0, ny = 0, best = Infinity, nearW = Infinity;
     for (let j = 0; j < n; j++) if (j !== i) {
       const [jx, jy] = proj(b[j].x, b[j].y), dx = jx - X, dy = jy - Y, d = Math.hypot(dx, dy);
-      /* Flat discs shrink so a neighbour stays visible; 3D spheres have depth and a depth test, and a tilted view would
-       * otherwise make them pulse whenever bodies merely pass one another on screen. */
-      if (d < best) { best = d; nx = dx; ny = dy; f = sky3d.on ? 1 : clamp(0.46 * d / (R + bodyR(b[j])), 0.3, 1); }
+      if (d < best) { best = d; nx = dx; ny = dy; f = clamp(0.46 * d / (R + bodyR(b[j])), 0.3, 1); }
+      nearW = Math.min(nearW, Math.hypot(b[j].x - b[i].x, b[j].y - b[i].y));
     }
+    /* Flat discs shrink when a neighbour is close on screen. A sphere has depth, and in a tilted view that rule would
+     * pulse whenever bodies merely pass one another, so in 3D only the close-up growth is limited: a body keeps its
+     * flat size, and grows past it no further than an eighth of the real distance to its nearest neighbour, so close
+     * pairs and moons stay apart and nothing outgrows the orbit it traces. */
+    if (sky3d.on) f = n > 1 ? clamp(Math.max(bodyR(b[i]), 0.12 * nearW * (S || scaleNow())) / R, 0, 1) : 1;
     const id = b[i].id;
     if (shrink[id] === undefined) shrink[id] = 1;
     shrink[id] += (f - shrink[id]) * k;
@@ -2422,7 +2426,7 @@ function render(now, dt) {
   if (sky3d.on) {
     sky3d.api.setQuality(perf.quality);
     sky3d.api.render({ bodies: world.cur, drawn, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
-      climates: visuals.climates, spinTime: visuals.spinTime, quality: perf.quality, colorOf: b => colorOf(b), grid: ui.view.grid });
+      climates: visuals.climates, spinTime: visuals.spinTime, quality: perf.quality, colorOf: b => colorOf(b) });
     if (paused && ui.view.forecast) drawForecast();
     if (ui.view.com) drawCOM();
     drawBodyOverlays(paused);
@@ -2640,7 +2644,7 @@ function refreshViewPane() {
   }
   for (const b of dom.trailSeg.children) b.setAttribute('aria-checked', String(b.dataset.v === ui.view.trails));
   for (const b of dom.modeSeg.children) { const on = b.dataset.v === ui.view.mode; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }
-  dom.cameraFields.hidden = !sky3d.on;
+  dom.cameraFields.hidden = !sky3d.on; dom.gridRow.hidden = sky3d.on;   // the 3D sky has no grid: the crosses read as a pattern over the scene
   if (sky3d.on) for (const b of dom.cameraSeg.children) { const on = b.dataset.v === (sky3d.api.rig.mode === 'follow' ? 'follow' : 'overview'); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }
   document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-checked', String(!!ui.view[b.dataset.view])));
 }
