@@ -86,6 +86,13 @@ export class CameraRig {
     this.vTheta = this.vPhi = 0; this.touch();
   }
   fling(vx, vy, h) { const k = TAU / Math.max(1, h) * 0.75; this.vTheta = -vx * k; this.vPhi = vy * k; this.touch(); }
+  /* Back to the starting heading and tilt by the shortest turn, smoothly. Never changes the mode. */
+  resetAngle() {
+    const home = -0.55, k = Math.round((this.goal.theta - home) / TAU);
+    this.goal.theta = home + k * TAU; this.goal.phi = 0.95; this.vTheta = this.vPhi = 0; this.touch();
+  }
+  /* Turn the heading at once by an angle, as two twisting fingers do. Never changes the mode. */
+  turn(dTheta) { this.goal.theta += dTheta; this.cur.theta = this.goal.theta; this.vTheta = 0; this.touch(); }
   /* A smooth turn by whole steps, for keys and buttons. */
   nudge(dTheta, dPhi) { this.goal.theta += dTheta; this.goal.phi = clamp(this.goal.phi + dPhi, this.minPhi, this.maxPhi); this.vTheta = this.vPhi = 0; this.touch(); }
   setTilt(phi) { this.goal.phi = clamp(phi, this.minPhi, this.maxPhi); this.vPhi = 0; this.touch(); }
@@ -105,14 +112,13 @@ export class CameraRig {
    * by the tilt, so a vertical move covers 1/cos(phi) as much ground as a sideways one. The page anchors the plane under
    * the finger exactly with shift(); this is the fallback when the pointer is above the horizon. */
   pan(dx, dy, pxPerWorld) {
-    if (this.mode === 'follow') return;
     const { right, forward } = basisOf(this.cur.theta, this.cur.phi), f = Math.hypot(forward[0], forward[2]) || 1;
     const ax = forward[0] / f, az = forward[2] / f, w = 1 / Math.max(1e-9, pxPerWorld), wy = w / Math.max(0.2, Math.cos(this.cur.phi));
     this.shift(-dx * right[0] * w + dy * ax * wy, -dx * right[2] * w + dy * az * wy);
   }
   /* Move the target across the plane by a distance in scene units. Leaves overview for manual; following ignores it. */
   shift(dx, dz) {
-    if (this.mode === 'follow') return;
+    if (this.mode === 'follow') this.setMode('manual');   // sliding away from a followed body means looking elsewhere
     this.goal.tx += dx; this.goal.tz += dz; this.cur.tx = this.goal.tx; this.cur.tz = this.goal.tz;
     if (this.mode === 'overview') this.setMode('manual');
     this.touch();
