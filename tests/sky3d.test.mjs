@@ -17,7 +17,9 @@ test('the main page loads the 3D module on demand through an import map, and kee
   assert.match(html, /import\(new URL\('src\/sky3d\.js', location\.href\)\.href\)/, 'three.js is only fetched when the 3D view is chosen');
   assert.match(html, /id="sky3d" aria-hidden="true" hidden/);
   assert.match(html, /id="modeSeg"[\s\S]*data-v="flat"[\s\S]*data-v="3d"/);
-  assert.match(html, /mode: 'flat', drift: true/, 'the flat chart stays the default');
+  assert.match(html, /mode: '3d', drift: true, chosen: false/, '3D is the default view');
+  assert.match(html, /else if \(!ui\.view\.chosen\) ui\.view\.mode = '3d';/, 'a saved flat view the person never picked gives way to 3D');
+  assert.match(html, /if \(!opts\.silent\) \{ ui\.view\.chosen = true;/, 'picking a view by hand is remembered');
   assert.match(html, /const sep = nearW \* \(S \|\| scaleNow\(\)\), floor = Ri \* clamp\(0\.46 \* sep \/ \(Ri \+ nearR\), 0\.3, 1\); f = clamp\(Math\.max\(floor, 0\.12 \* sep\)/,
     'spheres are sized by real neighbour distance, not on-screen distance, so they never pulse, never clump when seen from far off, and never outgrow their orbits');
   assert.doesNotMatch(html, /grid: ui\.view\.grid \}\)/, 'the 3D sky has no grid');

@@ -1415,7 +1415,9 @@ const restoreTrails = (m, s) => { m.clear(); for (const [id, snap] of s) trailFo
 /* ------------------------------------------------------------------ state */
 const ui = {
   speed: clamp(store.get('speed2', 0) | 0, 0, SPEEDS.length - 1),      // slow by default: the stories read better that way
-  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: 'flat', drift: true }, store.get('view', {})),
+  /* 3D is the default view. `chosen` marks a view the person picked themselves; a saved 'flat' without it is only the old
+   * default written back with another setting, so it gives way to 3D. */
+  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: '3d', drift: true, chosen: false }, store.get('view', {})),
   tab: 'bodies',
   sheet: null,
 };
@@ -1451,7 +1453,8 @@ const scaleNow = () => (sky3d.on ? sky3d.api.pxPerWorld : cam.scale);
 function setViewMode(mode, opts) {
   opts = opts || {};
   mode = mode === '3d' && !sky3d.failed ? '3d' : 'flat';
-  ui.view.mode = mode; if (!opts.silent) store.set('view', ui.view);
+  ui.view.mode = mode; if (!opts.silent) { ui.view.chosen = true; store.set('view', ui.view); }
+  sky3d.quiet = !!opts.quiet;
   if (mode === 'flat') { leaveThree(); refreshViewPane(); return; }
   if (sky3d.api) { enterThree(); refreshViewPane(); return; }
   refreshViewPane();
@@ -1465,8 +1468,8 @@ function setViewMode(mode, opts) {
     refreshViewPane();
   }).catch(err => {
     console.error(err);
-    sky3d.failed = true; sky3d.loading = null; ui.view.mode = 'flat'; store.set('view', ui.view); refreshViewPane();
-    say('no3d', NO_3D, true, { now: true });
+    sky3d.failed = true; sky3d.loading = null; ui.view.mode = 'flat'; refreshViewPane();
+    if (!sky3d.quiet) say('no3d', NO_3D, true, { now: true });   // the default view falls back to the flat chart without a word
   }).finally(() => clearTimeout(slow));
 }
 const NO_3D = 'The 3D view could not start in this browser, so the flat chart stays.';
@@ -3489,6 +3492,7 @@ function init() {
   readTheme(); wire(); resize(); measure();
   const askedView = new URLSearchParams(location.search).get('view');
   if (askedView === '3d' || askedView === 'flat') ui.view.mode = askedView;
+  else if (!ui.view.chosen) ui.view.mode = '3d';
   refreshViewPane();
   const saved = PRESETS.findIndex(p => p.id === store.get('preset', 'trisolaris'));
   const linked = skyFromHash(), seed = store.get('sky', 'default');
@@ -3498,7 +3502,7 @@ function init() {
   world.playing = !reducedMotion;
   refreshChrome(); measure();
   if (bodyRenderer) bodyRenderer.ready.then(() => { chipArtReady = true; refreshBodies(); invalidate(); }).catch(() => invalidate());
-  if (ui.view.mode === '3d') setViewMode('3d', { silent: true });
+  if (ui.view.mode === '3d') setViewMode('3d', { silent: true, quiet: !askedView && !ui.view.chosen });
   requestAnimationFrame(frame);
 }
 init();
