@@ -7,7 +7,7 @@ import { LineSegmentsGeometry } from '../vendor/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/LineMaterial.js';
 import { CameraRig, cameraOffset, climateTint, atmosphereTint, spinAngle, SPIN_PERIODS, STAR_PHASE, toneOf, clamp, TAU } from './sky3d-model.js';
 import { createSurfaceView } from './sky3d-surface.js';
-import { DEG, LATITUDE, R_EARTH_AU, localFrame, toLocal, altAz, starRadiusAU, worldRadiusAU, angularRadius, sunDaylight, skyDaylight, standingLongitude, spinFrame, solarDay, SkyLook } from './surface-model.js';
+import { DEG, LATITUDE, R_EARTH_AU, localFrame, toLocal, altAz, starRadiusAU, worldRadiusAU, angularRadius, sunDaylight, skyDaylight, standingLongitude, spinFrame, solarDay, SkyLook, phoneLook } from './surface-model.js';
 
 const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200, LINE_PX = 1.8;
 const LUM = b => (b.meta && b.meta.lum != null ? b.meta.lum : Math.pow(b.m, 3.5));   // a published brightness when the body carries one
@@ -449,7 +449,7 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
     const daylight = skyDaylight(suns), climate = climates ? (climates.get(b.id) ?? 2) : 2;
     const gas = b.kind === 'planet' && worldRadiusAU(b) > 2 * R_EARTH_AU;   // past the radius valley: deep air and no ground
     const airless = !!a.surface.airless, atmo = airless ? { rgb: [0, 0, 0], strength: 0 } : atmosphereTint(climate);   // no air: a black sky by day
-    surface.view.update({ basis, look: surface.look, suns, worlds, climate, atmo, airless, daylight: airless ? 0 : daylight, gas, surface: a.surface.name, seed: (b.id * 7919 + Math.round(b.m * 1e9)) >>> 0 });
+    surface.view.update({ basis, look: surface.look, suns, worlds, climate, atmo, airless, daylight: airless ? 0 : daylight, gas, moon: !!a.surface.moon, surface: a.surface.name, seed: (b.id * 7919 + Math.round(b.m * 1e9)) >>> 0 });
     surface.view.render();
     surface.info = { id: b.id, suns, worlds, daylight, gas, radiusEarth: worldRadiusAU(b) / R_EARTH_AU };
     return true;
@@ -496,5 +496,5 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
   applyCamera();
   return { rig, camera, scene, renderer, resize, setQuality, setTheme, setCenter, project, unproject, dollyAt, panAt, updateCamera, render, clear, dispose,
     sizeGain: b => SIZE_GAIN[kindOf(b)], standOn, leaveSurface, surfaceRate, skyPoint, horizonPoint, lookDrag, lookFling, lookZoom, updateSurface,
-    get surface() { return surface; }, get pxPerWorld() { return pxPerWorld; }, get dirty() { return dirty > 0; }, invalidate };
+    phoneLook, get surface() { return surface; }, get pxPerWorld() { return pxPerWorld; }, get dirty() { return dirty > 0; }, invalidate };
 }

@@ -3,7 +3,7 @@
  * AU from the centre of its system loses no precision. Everything in the sky sits in one group whose matrix turns scene
  * directions into that frame; the page's simulation decides where each body is, this file only draws it. */
 import * as THREE from 'three';
-import { DEG, smoothstep } from './surface-model.js';
+import { DEG, smoothstep, groundTiles, GLOW_OF } from './surface-model.js';
 
 const MAX_SUNS = 6, R_SKY = 3000, R_STARS = 2800, R_SUNS = 2500, R_WORLDS = 2400;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -116,18 +116,6 @@ export function createSurfaceView({ renderer, mapNamed }) {
       }`,
   });
   const ground = new THREE.Mesh(new THREE.CircleGeometry(2000, 96).rotateX(-Math.PI / 2).translate(0, -1.6, 0), groundMat(0)); scene.add(ground);
-  /* the tiles the climate walks through: snow, then green ground, dry, scorched; and the special grounds */
-  const LADDER = ['v5/ground-snow', 'v5/ground-grassland', 'v5/ground-grassland', 'v5/ground-desert', 'v5/ground-scorched'];
-  function groundTiles(f) {
-    if (f.gas) return ['v5/ground-cloudtops', 'v5/ground-cloudtops', 0];
-    if (f.surface === 'v5/moon-icy') return ['v5/ground-snow', 'v5/ground-snow', 0];
-    if (f.surface === 'v5/planet-barren') return ['v5/ground-regolith', 'v5/ground-regolith', 0];
-    if (f.surface === 'v5/planet-lava') return ['v5/ground-scorched', 'v5/ground-scorched', 0];
-    if (f.surface === 'moon-surface') return ['v5/ground-regolith', 'v5/ground-regolith', 0];
-    if (f.surface === 'v5/planet-arid' && f.climate > 1.5) return ['v5/ground-desert', f.climate > 3.5 ? 'v5/ground-scorched' : 'v5/ground-desert', Math.max(0, f.climate - 3.5) * 2];   // a desert world stays desert until it scorches
-    const c = clamp(f.climate, 0, 4), i = Math.min(3, Math.floor(c));
-    return [LADDER[i], LADDER[i + 1], c - i];
-  }
   const ridge = (radius, height, octave, far) => {
     const n = 720, pos = new Float32Array(n * 2 * 3), idx = [];
     for (let i = 0; i < n; i++) {
@@ -268,8 +256,10 @@ export function createSurfaceView({ renderer, mapNamed }) {
     groundU.uTexA.value = tile(ta); groundU.uTexB.value = tile(tb); groundU.uMix.value = mixT;
     groundU.uColor.value.setRGB(1, 1, 1);   // the tiles carry the colour now
     groundU.uLight.value = groundLight + 0.25 * f.daylight;
-    const scorched = ta === 'v5/ground-scorched' || tb === 'v5/ground-scorched';   // only scorched ground has the cracks that glow
-    const hz = f.airless ? [0.004, 0.005, 0.008] : horizonColor(f), glow = scorched ? (f.surface === 'v5/planet-lava' ? 1 : smoothstep(3.4, 4, f.climate)) * 0.05 : 0;
+    /* only scorched rock and open lava glow, each through its own mask; the mask follows the first tile's sampling */
+    const hot = GLOW_OF[ta] ? ta : GLOW_OF[tb] ? tb : null, lava = hot === 'v6/ground-lava';
+    if (hot) groundU.uGlowTex.value = tile(GLOW_OF[hot]);
+    const hz = f.airless ? [0.004, 0.005, 0.008] : horizonColor(f), glow = !hot ? 0 : (lava ? 0.7 : f.surface === 'v5/planet-lava' ? 1 : smoothstep(3.4, 4, f.climate)) * 0.05;
     groundU.uHaze.value.setRGB(hz[0], hz[1], hz[2]);
     groundU.uGlow.value.setRGB(glow * 1.4, glow * 0.25, glow * 0.04);
   }

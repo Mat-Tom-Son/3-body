@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEG, R_SUN_AU, R_EARTH_AU, M_EARTH_SUNS, LATITUDE, localFrame, toLocal, altAz, windOf, starRadiusAU, worldRadiusAU, angularRadius,
-  sunDaylight, skyDaylight, standingLongitude, lookVector, SkyLook } from '../src/surface-model.js';
+  sunDaylight, skyDaylight, standingLongitude, lookVector, SkyLook, phoneLook } from '../src/surface-model.js';
 
 const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -149,4 +149,34 @@ test('every real body wears the surface its physics calls for, the same in both 
     toi700: { 'TOI-700 c': 'v5/giant-neptunian', 'TOI-700 d': 'v5/planet-eyeball' },
   };
   for (const [id, bodies] of Object.entries(expect)) for (const [name, map] of Object.entries(bodies)) assert.equal(mapOf(id, name), map, `${id}: ${name}`);
+});
+
+test('looking with the phone: held upright it looks at the horizon, tipped back it looks up, turned it turns the heading', () => {
+  const up = phoneLook(0, 90, 0); near(up.alt, 0, 1e-12); near(up.az, 0, 1e-12);
+  near(phoneLook(0, 135, 0).alt, 45 * DEG, 1e-9, 'tipping the top of the phone back raises the view');
+  near(phoneLook(0, 45, 0).alt, -45 * DEG, 1e-9);
+  near(phoneLook(0, 0, 0).alt, -90 * DEG, 1e-9, 'flat on a table, face up, the camera looks at the ground');
+  near(phoneLook(90, 90, 0).az, -90 * DEG, 1e-9, 'alpha grows anticlockwise, so the heading turns the other way');
+  const held = new SkyLook(); held.turnBy(0.2, 2); near(held.az, 0.2, 1e-12); near(held.alt, 88 * DEG, 1e-12);
+});
+
+test('the ground underfoot matches the world: shore, broken ice, bare ice, lineae, hardpan and lava, walked by the climate', async () => {
+  const { groundTiles, GLOW_OF } = await import('../src/surface-model.js');
+  const { existsSync } = await import('node:fs');
+  const at = (surface, climate, more) => groundTiles({ surface, climate, ...more });
+  assert.deepEqual(at('v5/planet-ocean', 2), ['v6/ground-shore', 'v6/ground-shore', 0]);
+  assert.deepEqual(at('v5/planet-ocean', 0.5), ['v5/ground-snow', 'v6/ground-shore', 0.5], 'a cold sea freezes over');
+  assert.deepEqual(at('v5/planet-eyeball', 2), ['v6/ground-ice-margin', 'v6/ground-ice-margin', 0]);
+  assert.equal(at('v5/planet-eyeball', 0)[0], 'v6/ground-blue-ice');
+  assert.deepEqual(at('v5/moon-icy', 0), ['v6/ground-blue-ice', 'v6/ground-blue-ice', 0], 'a frozen locked world has no wind to shape snow');
+  assert.deepEqual(at('v5/moon-icy', 0, { moon: true }), ['v6/ground-ice-lineae', 'v6/ground-ice-lineae', 0]);
+  assert.deepEqual(at('v5/planet-arid', 2), ['v6/ground-hardpan', 'v6/ground-hardpan', 0]);
+  assert.deepEqual(at('v5/planet-arid', 4), ['v6/ground-hardpan', 'v5/ground-scorched', 1]);
+  assert.deepEqual(at('v5/planet-lava', 2), ['v6/ground-lava', 'v6/ground-lava', 0]);
+  assert.deepEqual(at('v5/planet-terran-b', 2.5), ['v5/ground-grassland', 'v5/ground-desert', 0.5], 'Earth-like worlds keep the climate ladder');
+  assert.deepEqual(groundTiles({ surface: 'v5/planet-ocean', climate: 2, gas: true }), ['v5/ground-cloudtops', 'v5/ground-cloudtops', 0]);
+  /* every tile and mask named here ships */
+  const names = new Set([...['v5/planet-ocean', 'v5/planet-eyeball', 'v5/moon-icy', 'v5/planet-arid', 'v5/planet-lava', 'v5/planet-barren', 'x']
+    .flatMap(s => [0, 0.5, 1.5, 2.5, 3.2, 4].flatMap(c => [false, true].flatMap(moon => groundTiles({ surface: s, climate: c, moon }).slice(0, 2)))), ...Object.values(GLOW_OF)]);
+  for (const n of names) assert.ok(existsSync(new URL(`../public/assets/bodies/${n}.webp`, import.meta.url)), n + ' ships');
 });

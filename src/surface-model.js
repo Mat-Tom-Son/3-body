@@ -105,6 +105,8 @@ export class SkyLook {
   drag(dx, dy, degPerPx) { this.goal = null; this.vaz = this.valt = 0; this.az -= dx * degPerPx * DEG; this.alt = clamp(this.alt + dy * degPerPx * DEG, -30 * DEG, 88 * DEG); }
   fling(vx, vy, degPerPx) { this.vaz = -vx * degPerPx * DEG; this.valt = vy * degPerPx * DEG; }
   zoom(factor) { this.fov = clamp(this.fov * factor, 12, 100); }
+  /* turn the head by an angle at once, as held keys do, within the same limits as a drag */
+  turnBy(dAz, dAlt) { this.goal = null; this.vaz = this.valt = 0; this.az += dAz; this.alt = clamp(this.alt + dAlt, -30 * DEG, 88 * DEG); }
   /* turn smoothly to face a point of the sky */
   face(az, alt) { this.goal = { az, alt: clamp(alt, -10 * DEG, 80 * DEG) }; this.vaz = this.valt = 0; }
   update(dt, reduced) {
@@ -122,4 +124,38 @@ export class SkyLook {
     if (Math.abs(this.vaz) + Math.abs(this.valt) < 1e-3) this.vaz = this.valt = 0;
     return true;
   }
+}
+
+/* Where a phone held up to the sky is looking, from its orientation event (degrees, W3C convention: alpha about the
+ * vertical, then beta about the phone's width, then gamma about its length). The camera looks out of the back of the
+ * screen, along the phone's -z, which no screen rotation changes. Returns the heading (radians, clockwise from the
+ * reference alpha measures from, which need not be north) and the altitude above the horizon. */
+export function phoneLook(alpha, beta, gamma) {
+  const a = alpha * DEG, b = beta * DEG, g = gamma * DEG;
+  const sa = Math.sin(a), ca = Math.cos(a), sb = Math.sin(b), cb = Math.cos(b), sg = Math.sin(g), cg = Math.cos(g);
+  const x = -sg * ca - cg * sb * sa, y = -sg * sa + cg * sb * ca, z = -cg * cb;   // east, north, up
+  return { az: Math.atan2(x, y), alt: Math.asin(clamp(z, -1, 1)) };
+}
+
+/* The ground underfoot: two tiles and how far between them, and the glow mask for the one that can glow. The world's
+ * map from space decides the kind of ground; the climate (0 frozen, 1-3 liveable, 4 burning) walks it toward ice or
+ * scorched rock. f: { surface (the map's name), climate, gas, moon }. */
+const LADDER = ['v5/ground-snow', 'v5/ground-grassland', 'v5/ground-grassland', 'v5/ground-desert', 'v5/ground-scorched'];
+const SCORCHED = 'v5/ground-scorched', LAVA = 'v6/ground-lava';
+export const GLOW_OF = { [SCORCHED]: 'v5/ground-scorched-glow', [LAVA]: 'v6/ground-lava-glow' };
+export function groundTiles(f) {
+  const c = clamp(f.climate, 0, 4), one = t => [t, t, 0];
+  /* a world of its own kind: ice below the liveable range, scorched rock past it */
+  const own = (t, cold = 'v5/ground-snow') => (c < 1 ? [cold, t, c] : c > 3.5 ? [t, SCORCHED, (c - 3.5) * 2] : one(t));
+  if (f.gas) return one('v5/ground-cloudtops');
+  switch (f.surface) {
+    case 'v5/planet-lava': return one(LAVA);
+    case 'v5/planet-barren': case 'moon-surface': return one('v5/ground-regolith');
+    case 'v5/moon-icy': return one(f.moon ? 'v6/ground-ice-lineae' : 'v6/ground-blue-ice');   // airless ice: no wind to shape snow
+    case 'v5/planet-eyeball': return own('v6/ground-ice-margin', 'v6/ground-blue-ice');   // the ring of shore and broken ice round the sunlit sea
+    case 'v5/planet-ocean': return own('v6/ground-shore');
+    case 'v5/planet-arid': return own('v6/ground-hardpan');
+  }
+  const i = Math.min(3, Math.floor(c));
+  return [LADDER[i], LADDER[i + 1], c - i];
 }

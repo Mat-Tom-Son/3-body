@@ -170,3 +170,16 @@ test('two fingers twisting clockwise on screen turn the scene clockwise with the
   rig.turn(0.1);                             // the page passes the fingers' own (y-down) angle change
   assert.ok(screenAngle(rig.cur.theta) - before > 0.03, 'the scene turns the same way as the fingers');
 });
+
+test('held keys fly the camera across the plane toward where it faces, at a pace set by the distance, leaving follow', () => {
+  const rig = new CameraRig();
+  rig.setMode('follow', 2); rig.cur.dist = rig.goal.dist = 4;
+  const { forward, right } = basisOf(rig.cur.theta, rig.cur.phi), f = Math.hypot(forward[0], forward[2]);
+  rig.move(1, 0, 0.5);
+  assert.equal(rig.mode, 'manual', 'flying away from a followed body means looking elsewhere');
+  near(rig.cur.tx, forward[0] / f * 1.2, 1e-12); near(rig.cur.tz, forward[2] / f * 1.2, 1e-12);   // 0.6 × 4 × 0.5
+  const tx = rig.cur.tx, tz = rig.cur.tz;
+  rig.move(0, -1, 0.25);
+  near(rig.cur.tx - tx, -right[0] * 0.6, 1e-12); near(rig.cur.tz - tz, -right[2] * 0.6, 1e-12);
+  near(Math.hypot(rig.goal.tx - rig.cur.tx, rig.goal.tz - rig.cur.tz), 0, 1e-12);
+});
