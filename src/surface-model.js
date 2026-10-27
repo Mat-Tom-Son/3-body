@@ -105,6 +105,8 @@ export class SkyLook {
   drag(dx, dy, degPerPx) { this.goal = null; this.vaz = this.valt = 0; this.az -= dx * degPerPx * DEG; this.alt = clamp(this.alt + dy * degPerPx * DEG, -30 * DEG, 88 * DEG); }
   fling(vx, vy, degPerPx) { this.vaz = -vx * degPerPx * DEG; this.valt = vy * degPerPx * DEG; }
   zoom(factor) { this.fov = clamp(this.fov * factor, 12, 100); }
+  /* turn the head by an angle at once, as held keys do, within the same limits as a drag */
+  turnBy(dAz, dAlt) { this.goal = null; this.vaz = this.valt = 0; this.az += dAz; this.alt = clamp(this.alt + dAlt, -30 * DEG, 88 * DEG); }
   /* turn smoothly to face a point of the sky */
   face(az, alt) { this.goal = { az, alt: clamp(alt, -10 * DEG, 80 * DEG) }; this.vaz = this.valt = 0; }
   update(dt, reduced) {
@@ -122,4 +124,15 @@ export class SkyLook {
     if (Math.abs(this.vaz) + Math.abs(this.valt) < 1e-3) this.vaz = this.valt = 0;
     return true;
   }
+}
+
+/* Where a phone held up to the sky is looking, from its orientation event (degrees, W3C convention: alpha about the
+ * vertical, then beta about the phone's width, then gamma about its length). The camera looks out of the back of the
+ * screen, along the phone's -z, which no screen rotation changes. Returns the heading (radians, clockwise from the
+ * reference alpha measures from, which need not be north) and the altitude above the horizon. */
+export function phoneLook(alpha, beta, gamma) {
+  const a = alpha * DEG, b = beta * DEG, g = gamma * DEG;
+  const sa = Math.sin(a), ca = Math.cos(a), sb = Math.sin(b), cb = Math.cos(b), sg = Math.sin(g), cg = Math.cos(g);
+  const x = -sg * ca - cg * sb * sa, y = -sg * sa + cg * sb * ca, z = -cg * cb;   // east, north, up
+  return { az: Math.atan2(x, y), alt: Math.asin(clamp(z, -1, 1)) };
 }

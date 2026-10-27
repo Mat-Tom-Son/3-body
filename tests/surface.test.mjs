@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEG, R_SUN_AU, R_EARTH_AU, M_EARTH_SUNS, LATITUDE, localFrame, toLocal, altAz, windOf, starRadiusAU, worldRadiusAU, angularRadius,
-  sunDaylight, skyDaylight, standingLongitude, lookVector, SkyLook } from '../src/surface-model.js';
+  sunDaylight, skyDaylight, standingLongitude, lookVector, SkyLook, phoneLook } from '../src/surface-model.js';
 
 const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -149,4 +149,13 @@ test('every real body wears the surface its physics calls for, the same in both 
     toi700: { 'TOI-700 c': 'v5/giant-neptunian', 'TOI-700 d': 'v5/planet-eyeball' },
   };
   for (const [id, bodies] of Object.entries(expect)) for (const [name, map] of Object.entries(bodies)) assert.equal(mapOf(id, name), map, `${id}: ${name}`);
+});
+
+test('looking with the phone: held upright it looks at the horizon, tipped back it looks up, turned it turns the heading', () => {
+  const up = phoneLook(0, 90, 0); near(up.alt, 0, 1e-12); near(up.az, 0, 1e-12);
+  near(phoneLook(0, 135, 0).alt, 45 * DEG, 1e-9, 'tipping the top of the phone back raises the view');
+  near(phoneLook(0, 45, 0).alt, -45 * DEG, 1e-9);
+  near(phoneLook(0, 0, 0).alt, -90 * DEG, 1e-9, 'flat on a table, face up, the camera looks at the ground');
+  near(phoneLook(90, 90, 0).az, -90 * DEG, 1e-9, 'alpha grows anticlockwise, so the heading turns the other way');
+  const held = new SkyLook(); held.turnBy(0.2, 2); near(held.az, 0.2, 1e-12); near(held.alt, 88 * DEG, 1e-12);
 });

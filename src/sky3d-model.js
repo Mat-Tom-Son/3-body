@@ -123,6 +123,14 @@ export class CameraRig {
     if (this.mode === 'overview') this.setMode('manual');
     this.touch();
   }
+  /* Fly across the plane while keys are held: fwd and side from -1 to 1, toward where the camera faces and to its right.
+   * The speed is in proportion to the distance, so a held key crosses about half the view each second at any zoom.
+   * Like a slide, it leaves overview and follow for manual. */
+  move(fwd, side, dt) {
+    const { right, forward } = basisOf(this.cur.theta, this.cur.phi), f = Math.hypot(forward[0], forward[2]) || 1, v = 0.6 * this.cur.dist * dt;
+    this.shift((forward[0] / f * fwd + right[0] * side) * v, (forward[2] / f * fwd + right[2] * side) * v);
+    this.vtx = this.vtz = 0; this.prevGoal = null;   // the keys' own motion, not a velocity to carry on after they let go
+  }
   /* One frame. env: { dt, points: [[x,z]...] to keep in view, follow: [x,z] or null, followDefault: distance, tanH, tanV,
    * minHalf: the smallest half-extent worth framing, playing, reduced, hold: true while a body is being dragged }.
    * Returns true when the picture changed. */
