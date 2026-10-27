@@ -2,7 +2,9 @@
  * simulation state, so every rule here is checked headlessly. The physics is untouched: this file only reads positions.
  * Scene coordinates: the orbital plane is the floor, x stays x, the simulation's y becomes -z, and up is +y. */
 export const TAU = Math.PI * 2;
-export const SPIN_PERIODS = { planet: 24, moon: 56, amber: 48, cyan: 56, coral: 64 };   // seconds per turn at 1×, as on the flat page
+/* Seconds per turn at 1× playback. Like the flat page these follow simulated progress, so speed changes scale them, but
+ * a sphere shows its whole face turning, and these shorter periods keep that motion visible even at 0.25×. */
+export const SPIN_PERIODS = { planet: 9, moon: 16, giant: 12, amber: 18, cyan: 22, coral: 26 };   // giant: an untagged world, such as the Planet and moon preset's planet
 export const TONES = ['amber', 'cyan', 'coral'];
 export const STAR_PHASE = { amber: 0.25, cyan: 2.3, coral: 4.65 };
 export const toneOf = id => TONES[((id % 3) + 3) % 3];

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { build } from '../scripts/build.mjs';
 import { createAppServer } from '../server.mjs';
-import { CameraRig, basisOf, cameraOffset, fitDistance, gridStep, climateTint, atmosphereTint, spinAngle, toneOf } from '../src/sky3d-model.js';
+import { CameraRig, basisOf, cameraOffset, fitDistance, gridStep, climateTint, atmosphereTint, spinAngle, toneOf, SPIN_PERIODS } from '../src/sky3d-model.js';
 
 const near = (a, b, tolerance = 1e-9) => assert.ok(Math.abs(a - b) <= tolerance * Math.max(1, Math.abs(a), Math.abs(b)), `${a} != ${b}`);
 const fit = { tanH: 0.6, tanV: 0.4, playing: true };
@@ -18,6 +18,7 @@ test('the main page loads the 3D module on demand through an import map, and kee
   assert.match(html, /id="sky3d" aria-hidden="true" hidden/);
   assert.match(html, /id="modeSeg"[\s\S]*data-v="flat"[\s\S]*data-v="3d"/);
   assert.match(html, /mode: 'flat', drift: true/, 'the flat chart stays the default');
+  assert.match(html, /f = sky3d\.on \? 1 : clamp\(0\.46 \* d/, 'spheres never shrink for an on-screen neighbour, which would pulse in a tilted view');
   for (const name of ['drawGrid', 'drawTrails', 'drawBodies', 'drawBodyMarks', 'drawBodyOverlays', 'fitPoints', 'setViewMode', 'followBody']) assert.match(html, new RegExp(`function ${name}\\(`), `${name} must exist`);
 });
 
@@ -126,5 +127,7 @@ test('grid, tints, spin and tones follow the flat page', () => {
   assert.ok(climateTint(0).amount > 0.5 && climateTint(4).amount > 0.5);
   assert.ok(atmosphereTint(4).rgb[0] > atmosphereTint(2).rgb[0], 'a burning world glows warmer');
   near(spinAngle(36, 24), Math.PI);
+  for (const kind of ['planet', 'moon', 'giant', 'amber', 'cyan', 'coral']) assert.ok(Number.isFinite(SPIN_PERIODS[kind]), kind + ' must have a spin period or its sphere gets a NaN rotation and vanishes');
+  for (const [kind, period] of Object.entries(SPIN_PERIODS)) assert.ok(period <= 30 && period >= 6, kind + ' turns visibly at 0.25× without blurring at 1×');
   assert.equal(toneOf(4), 'cyan');
 });

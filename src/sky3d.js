@@ -66,7 +66,8 @@ export function createSky3D({ canvas }) {
       shader.uniforms.uTint = tint; shader.uniforms.uTintAmount = amount;
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', '#include <common>\nuniform vec3 uTint;\nuniform float uTintAmount;')
-        .replace('#include <map_fragment>', '#include <map_fragment>\n\tdiffuseColor.rgb = mix(diffuseColor.rgb, uTint, uTintAmount);');
+        /* The climate wash keeps the map's light and dark structure, so ice or ember still show the turning surface. */
+        .replace('#include <map_fragment>', '#include <map_fragment>\n\tfloat mapLum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));\n\tdiffuseColor.rgb = mix(diffuseColor.rgb, uTint * (0.35 + 1.3 * mapLum), uTintAmount);');
     };
     material.customProgramCacheKey = () => 'sky3d-world';
     material.userData.tint = tint; material.userData.amount = amount;
@@ -74,10 +75,14 @@ export function createSky3D({ canvas }) {
   }
   /* A sun: its own light, granulation from the shared map, darker toward the limb as real stars are. */
   function starMaterial(color) {
-    const material = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveMap: maps.star, emissiveIntensity: 1.9, roughness: 1, metalness: 0 });
+    const material = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveMap: maps.star, emissiveIntensity: 0.55, roughness: 1, metalness: 0 });
     material.onBeforeCompile = shader => {
+      /* The granulation map is a low-contrast grey (about 0.22 linear); stretch it around its mean so the cells read as
+       * the sun turns, then darken toward the limb. */
       shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\n\tfloat limb = pow(saturate(dot(normalize(normal), normalize(vViewPosition))), 0.55);\n\ttotalEmissiveRadiance *= 0.42 + 0.78 * limb;');
+        '\tfloat grain = dot(texture2D(emissiveMap, vEmissiveMapUv).rgb, vec3(0.299, 0.587, 0.114));\n' +
+        '\ttotalEmissiveRadiance *= mix(0.5, 1.35, clamp(0.5 + (grain - 0.22) * 6.0, 0.0, 1.0));\n' +
+        '\tfloat limb = pow(saturate(dot(normalize(normal), normalize(vViewPosition))), 0.55);\n\ttotalEmissiveRadiance *= 0.42 + 0.78 * limb;');
     };
     material.customProgramCacheKey = () => 'sky3d-star';
     return material;
@@ -108,7 +113,9 @@ export function createSky3D({ canvas }) {
       atmo = new THREE.Mesh(sphereLow, atmosphereMaterial()); atmo.scale.setScalar(1.07); atmo.renderOrder = 2; group.add(atmo);
     } else if (kind === 'moon') mesh = new THREE.Mesh(sphere, worldMaterial(maps.moon, 0.95));
     else { mesh = new THREE.Mesh(sphere, worldMaterial(maps.moon, 0.75)); mesh.material.userData.tint.value.set(0.85, 0.6, 0.3); mesh.material.userData.amount.value = 0.55; }
-    mesh.rotation.z = kind === 'star' ? 0 : 0.1;
+    /* Spin about the body's own axis first, then lean that axis: a fixed axial tilt rather than a wobble. */
+    mesh.rotation.order = 'ZYX';
+    mesh.rotation.z = { star: 0, planet: 0.41, moon: 0.12, giant: 0.2 }[kind];
     group.add(mesh);
     const geometry = new LineSegmentsGeometry();
     LineSegmentsGeometry.prototype.setPositions.call(geometry, new Float32Array(SEG_CAP * 6));

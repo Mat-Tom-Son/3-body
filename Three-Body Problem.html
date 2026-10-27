@@ -2169,6 +2169,7 @@ function updateCamera(dt) {
 
 /* ------------------------------------------------------------------ drawing */
 const shrink = {};
+let gain3d = 1;                           // eased 3D close-up growth, so a camera cut or clamp never makes every body jump in size
 const drawn = new Map();                 // id -> {x, y, r} in screen space, for hit-testing and labels
 function nominalR(m) { return clamp(3.4 + 1.25 * (Math.log10(Math.max(m, 1e-7)) + 6) + 2.4 * Math.cbrt(m), 3.4, 21); }
 function bodyR(b) {                      // worlds are drawn small and never glow, so they read as worlds beside the stars
@@ -2260,7 +2261,9 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
   drawn.clear();
   const b = world.cur, n = b.length, k = reducedMotion ? 1 : 1 - Math.exp(-dt * 14);
   /* In 3D a close look should show more of a body: sizes grow gently past the scale at which the whole setup fills the view. */
-  const gain = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.R0 / view.h, 0.6), 1, 10) : 1;
+  const gainWant = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.R0 / view.h, 0.6), 1, 10) : 1;
+  gain3d += (gainWant - gain3d) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3));
+  const gain = gain3d;
   for (let i = 0; i < n; i++) {
     let X, Y, S = 0;
     if (sky3d.on) { const p = sky3d.api.project(b[i].x, b[i].y); X = p.x; Y = p.y; S = p.s; } else { X = sx(b[i].x); Y = sy(b[i].y); }
@@ -2268,7 +2271,9 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
     let f = 1, nx = 0, ny = 0, best = Infinity;
     for (let j = 0; j < n; j++) if (j !== i) {
       const [jx, jy] = proj(b[j].x, b[j].y), dx = jx - X, dy = jy - Y, d = Math.hypot(dx, dy);
-      if (d < best) { best = d; nx = dx; ny = dy; f = clamp(0.46 * d / (R + bodyR(b[j])), 0.3, 1); }
+      /* Flat discs shrink so a neighbour stays visible; 3D spheres have depth and a depth test, and a tilted view would
+       * otherwise make them pulse whenever bodies merely pass one another on screen. */
+      if (d < best) { best = d; nx = dx; ny = dy; f = sky3d.on ? 1 : clamp(0.46 * d / (R + bodyR(b[j])), 0.3, 1); }
     }
     const id = b[i].id;
     if (shrink[id] === undefined) shrink[id] = 1;
