@@ -141,7 +141,10 @@ test('panning shifts the target across the plane, reduced motion stops a fling, 
   assert.equal(rig.mode, 'manual', 'a pan leaves overview');
   near(rig.cur.tx, rig.goal.tx); near(rig.goal.tz, rig.cur.tz);
   const follow = new CameraRig(); follow.setMode('follow', 3); follow.shift(5, 5);
-  assert.equal(follow.goal.tx, 0, 'a followed body keeps the centre');
+  assert.equal(follow.mode, 'manual', 'sliding away from a followed body stops following it');
+  assert.equal(follow.goal.tx, 5);
+  const twist = new CameraRig(), theta0 = twist.goal.theta; twist.turn(0.3);
+  near(twist.cur.theta, theta0 + 0.3); assert.equal(twist.mode, 'overview', 'a twist never changes the mode');
   /* the tilt foreshortens the plane, so a vertical drag covers 1/cos(phi) as much ground as a sideways one */
   const tilt = new CameraRig(); tilt.mode = 'manual'; tilt.cur.theta = tilt.goal.theta = 0; tilt.cur.phi = tilt.goal.phi = 1;
   tilt.pan(0, 10, 100); const vertical = Math.hypot(tilt.goal.tx, tilt.goal.tz);
@@ -153,4 +156,17 @@ test('panning shifts the target across the plane, reduced motion stops a fling, 
   const pts = [[0.3, -1.2], [2, 0.4], [-1, 1]], at = { theta: 0.4, phi: 0.9, tx: 0.2, tz: -0.1 }, env = { ...fit, minHalf: 0.5 };
   const rel = pts.map(([x, z]) => [x - at.tx, 0, z - at.tz]).concat([[0.5, 0, 0], [-0.5, 0, 0], [0, 0, 0.5], [0, 0, -0.5]]);
   near(new CameraRig().distanceFor(pts, at, env, 1), fitDistance(rel, { ...basisOf(at.theta, at.phi), tanH: fit.tanH, tanV: fit.tanV, margin: 1.12, min: 0.05 }));
+});
+
+test('two fingers twisting clockwise on screen turn the scene clockwise with them', async () => {
+  const THREE = await import('three');
+  const screenAngle = theta => {
+    const off = cameraOffset(theta, 0.95, 10), cam = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
+    cam.position.set(off[0], off[1], off[2]); cam.lookAt(0, 0, 0); cam.updateMatrixWorld();
+    const p = new THREE.Vector3(2, 0, 0).project(cam);
+    return Math.atan2(-p.y, p.x);            // screen angle with y down, as pointer events measure it
+  };
+  const rig = new CameraRig(), before = screenAngle(rig.cur.theta);
+  rig.turn(0.1);                             // the page passes the fingers' own (y-down) angle change
+  assert.ok(screenAngle(rig.cur.theta) - before > 0.03, 'the scene turns the same way as the fingers');
 });

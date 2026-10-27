@@ -230,6 +230,10 @@ body.customizing.bottom-sheet .caption { display: none; }
 .chip .ic { width: 20px; height: 20px; }
 .chip.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 
+/* the 3D compass: its needle turns with the camera; a tap brings back the starting angle */
+.compass { position: absolute; right: 8px; bottom: calc(19px + var(--inset-bottom, 0px)); padding: 0; min-width: 48px; width: 48px; }
+.compass .ic { transition: none; }
+body.bottom-sheet.customizing .compass { display: none; }
 .transport { display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 34px; box-shadow: 0 6px 24px var(--shadow); }
 .t-btn { width: 44px; height: 48px; border-radius: 24px; display: inline-flex; align-items: center; justify-content: center; }
 .t-btn:active, .chip:active, .x-btn:active, .sq-btn:active, .stepper button:active { background: var(--fill-strong); }
@@ -407,6 +411,8 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     <symbol id="i-vert" viewBox="0 0 24 24"><path d="M12 4v16M8.5 7.5L12 4l3.5 3.5M8.5 16.5L12 20l3.5-3.5"/></symbol>
     <symbol id="i-planet" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.2"/><path d="M4.2 15.4c3.6 1.6 9.6.4 14.2-3.1M5.6 8.4C9.5 6.8 15.6 7.3 19.8 10.4"/></symbol>
     <symbol id="i-sky" viewBox="0 0 24 24"><circle cx="7" cy="9" r="2.3" fill="currentColor" stroke="none"/><circle cx="16.5" cy="6.5" r="1.7" fill="currentColor" stroke="none"/><circle cx="14.5" cy="16" r="2.8" fill="currentColor" stroke="none"/><circle cx="6.5" cy="17.5" r="1.3" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><path d="M12 3.2l3.1 8.8h-6.2z" fill="currentColor" stroke="none"/><path d="M12 20.8l-3.1-8.8h6.2z" fill="none" stroke-width="1.6"/></symbol>
+    <symbol id="i-stand" viewBox="0 0 24 24"><path d="M3 17.5h18"/><path d="M6.5 17.5a5.5 5.5 0 0 1 11 0"/><path d="M12 4.5v2.2M5.2 7.6l1.5 1.5M18.8 7.6l-1.5 1.5"/><path d="M4 20.5h4M11 20.5h9"/></symbol>
     <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13.5 6.5L19 12l-5.5 5.5"/></symbol>
   </defs>
 </svg>
@@ -441,6 +447,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     </div>
   </div>
 
+  <button id="compassBtn" class="icon-btn compass" type="button" hidden aria-label="Reset the view angle" title="Reset the view angle"><svg class="ic" id="compassIc" aria-hidden="true"><use href="#i-compass"/></svg></button>
   <div class="bottom" id="bottom">
     <div class="scale" id="scale" aria-hidden="true"><span class="bar" id="scaleBar"></span><span class="lbl" id="scaleLbl">Earth–Sun distance</span></div>
     <div class="context" id="context">
@@ -448,6 +455,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       <button id="resetBtn" class="chip" type="button" hidden><svg class="ic" aria-hidden="true"><use href="#i-reset"/></svg>Reset</button>
       <button id="planetBtn" class="chip" type="button" hidden title="Drop an Earth-mass world into this setup"><svg class="ic" aria-hidden="true"><use href="#i-planet"/></svg>Add a planet</button>
       <button id="skyBtn" class="chip" type="button" hidden aria-haspopup="dialog" aria-controls="skiesSheet" aria-keyshortcuts="S" title="Other skies, and your own seed"><svg class="ic" aria-hidden="true"><use href="#i-sky"/></svg>Skies</button>
+      <button id="standBtn" class="chip" type="button" hidden aria-keyshortcuts="G"><svg class="ic" aria-hidden="true"><use href="#i-stand"/></svg><span>Stand on the planet</span></button>
       <button id="fitBtn" class="chip" type="button" hidden aria-keyshortcuts="F" title="Frame every body again"><svg class="ic" aria-hidden="true"><use href="#i-fit"/></svg>Show all</button>
     </div>
     <div class="transport" id="transport" role="toolbar" aria-label="Playback">
@@ -543,6 +551,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
           <div class="seg" role="radiogroup" aria-labelledby="cameraLbl" id="cameraSeg">
             <button type="button" role="radio" data-v="overview" aria-checked="true" tabindex="0">Show all</button>
             <button type="button" role="radio" data-v="follow" aria-checked="false" tabindex="-1">Follow selected</button>
+            <button type="button" role="radio" data-v="surface" aria-checked="false" tabindex="-1">On the surface</button>
           </div>
         </div>
         <div class="field">
@@ -1031,43 +1040,45 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     return b;
   }
   const origin = m => ({ m, x: 0, y: 0, vx: 0, vy: 0 });
+  /* Radii (meta.radius: suns in solar radii, worlds in Earth radii) are the published ones, from the same papers and the
+     NSSDC fact sheets; a body with none measured (Proxima b and d, all of Gliese 667) takes the mass–radius rule. */
   function homeSystem() {                 // JPL planetary fact sheets
-    const S = sun(0, 1, { name: 'the Sun', label: 'S', tone: 'amber', lum: 1 });
-    const earth = around(S, world(1, M_EARTH, 'planet', { name: 'Earth', label: 'E', follow: true }), 1.0, 0.0167, 0.4);
-    const jupiter = around(S, world(2, J, null, { name: 'Jupiter', label: 'J' }), 5.2044, 0.0489, 3.9);
+    const S = sun(0, 1, { name: 'the Sun', label: 'S', tone: 'amber', lum: 1, radius: 1 });
+    const earth = around(S, world(1, M_EARTH, 'planet', { name: 'Earth', label: 'E', radius: 1, days: 365.25, follow: true }), 1.0, 0.0167, 0.4);
+    const jupiter = around(S, world(2, J, null, { name: 'Jupiter', label: 'J', radius: 10.973 }), 5.2044, 0.0489, 3.9);
     return toCOM([S, earth, jupiter]);
   }
   function trappistSystem() {             // Agol et al. 2021; Gillon et al. 2017
-    const T = sun(0, 0.0898, { name: 'TRAPPIST-1', label: 'T', tone: 'coral', lum: 5.66e-4 });
-    const P = [['b', 1.374, 0.01154], ['c', 1.308, 0.01580], ['d', 0.388, 0.02227], ['e', 0.692, 0.02925], ['f', 1.039, 0.03849], ['g', 1.321, 0.04683], ['h', 0.326, 0.06189]];
+    const T = sun(0, 0.0898, { name: 'TRAPPIST-1', label: 'T', tone: 'coral', lum: 5.66e-4, radius: 0.1192 });
+    const P = [['b', 1.374, 0.01154, 1.116], ['c', 1.308, 0.01580, 1.097], ['d', 0.388, 0.02227, 0.788], ['e', 0.692, 0.02925, 0.920], ['f', 1.039, 0.03849, 1.045], ['g', 1.321, 0.04683, 1.129], ['h', 0.326, 0.06189, 0.755]];
     const list = [T];
-    P.forEach(([l, m, a], k) => list.push(around(T, world(k + 1, m * M_EARTH, 'planet', { name: 'TRAPPIST-1 ' + l, label: l, locked: true, follow: l === 'e' }), a, 0, (k * 2.399) % 6.2832)));
+    P.forEach(([l, m, a, r], k) => list.push(around(T, world(k + 1, m * M_EARTH, 'planet', { name: 'TRAPPIST-1 ' + l, label: l, radius: r, locked: true, follow: l === 'e' }), a, 0, (k * 2.399) % 6.2832)));
     return toCOM(list);
   }
   function proximaSystem() {              // Anglada-Escudé et al. 2016; Faria et al. 2022
-    const P = sun(0, 0.1221, { name: 'Proxima', label: 'P', tone: 'coral', lum: 0.0017 });
+    const P = sun(0, 0.1221, { name: 'Proxima', label: 'P', tone: 'coral', lum: 0.0017, radius: 0.141 });
     const d = around(P, world(1, 0.26 * M_EARTH, 'planet', { name: 'Proxima d', label: 'd', locked: true }), 0.02885, 0, 2.1);
     const b = around(P, world(2, 1.07 * M_EARTH, 'planet', { name: 'Proxima b', label: 'b', locked: true, follow: true }), 0.04856, 0, 5.0);
     return toCOM([P, d, b]);
   }
   function kepler442System() {            // Torres et al. 2015
-    const K = sun(0, 0.61, { name: 'Kepler-442', label: 'K', tone: 'amber', lum: 0.117 });
-    const b = around(K, world(1, 2.3 * M_EARTH, 'planet', { name: 'Kepler-442 b', label: 'b', follow: true }), 0.409, 0.04, 1.2);
+    const K = sun(0, 0.61, { name: 'Kepler-442', label: 'K', tone: 'amber', lum: 0.117, radius: 0.598 });
+    const b = around(K, world(1, 2.3 * M_EARTH, 'planet', { name: 'Kepler-442 b', label: 'b', radius: 1.34, follow: true }), 0.409, 0.04, 1.2);
     return toCOM([K, b]);
   }
   function alphaCenSystem() {             // Pourbaix & Boffin 2016; Akeson et al. 2021. The planet is placed, not found.
-    const A = sun(0, 1.0788, { name: 'Alpha Centauri A', tone: 'amber', lum: 1.5059 }), Bb = sun(1, 0.9092, { name: 'Alpha Centauri B', tone: 'coral', lum: 0.4981 });
+    const A = sun(0, 1.0788, { name: 'Alpha Centauri A', tone: 'amber', lum: 1.5059, radius: 1.2175 }), Bb = sun(1, 0.9092, { name: 'Alpha Centauri B', tone: 'coral', lum: 0.4981, radius: 0.8591 });
     pairUp(A, Bb, 23.299, 0.5195, 2.4);
     const p = around(Bb, world(2, M_EARTH, 'planet', { placed: true, follow: true }), 0.70, 0, 0.8);
     return toCOM([A, Bb, p]);
   }
   function kepler47System() {             // Orosz et al. 2012, 2019
-    const A = sun(0, 0.957, { name: 'Kepler-47 A', tone: 'amber', lum: 0.840 }), Bb = sun(1, 0.342, { name: 'Kepler-47 B', tone: 'coral', lum: 0.014 });
+    const A = sun(0, 0.957, { name: 'Kepler-47 A', tone: 'amber', lum: 0.840, radius: 0.936 }), Bb = sun(1, 0.342, { name: 'Kepler-47 B', tone: 'coral', lum: 0.014, radius: 0.338 });
     pairUp(A, Bb, 0.08145, 0.0288, 0.6);
     const both = origin(A.m + Bb.m);
-    const b = around(both, world(2, 2.07 * M_EARTH, 'planet', { name: 'Kepler-47 b', label: 'b' }), 0.2877, 0.021, 3.3);
-    const d = around(both, world(3, 19.0 * M_EARTH, 'planet', { name: 'Kepler-47 d', label: 'd' }), 0.6992, 0.024, 5.1);
-    const c = around(both, world(4, 3.17 * M_EARTH, 'planet', { name: 'Kepler-47 c', label: 'c', follow: true }), 0.9638, 0.044, 1.0);
+    const b = around(both, world(2, 2.07 * M_EARTH, 'planet', { name: 'Kepler-47 b', label: 'b', radius: 3.05 }), 0.2877, 0.021, 3.3);
+    const d = around(both, world(3, 19.0 * M_EARTH, 'planet', { name: 'Kepler-47 d', label: 'd', radius: 7.04 }), 0.6992, 0.024, 5.1);
+    const c = around(both, world(4, 3.17 * M_EARTH, 'planet', { name: 'Kepler-47 c', label: 'c', radius: 4.65, follow: true }), 0.9638, 0.044, 1.0);
     return toCOM([A, Bb, b, d, c]);
   }
   function gliese667System() {            // Anglada-Escudé et al. 2013; Delfosse et al. 2013. C's orbit about the pair is assumed circular.
@@ -1455,7 +1466,7 @@ function setViewMode(mode, opts) {
   mode = mode === '3d' && !sky3d.failed ? '3d' : 'flat';
   ui.view.mode = mode; if (!opts.silent) { ui.view.chosen = true; store.set('view', ui.view); }
   sky3d.quiet = !!opts.quiet;
-  if (mode === 'flat') { leaveThree(); refreshViewPane(); return; }
+  if (mode === 'flat') { sky3d.wantSurface = false; leaveThree(); refreshViewPane(); return; }
   if (sky3d.api) { enterThree(); refreshViewPane(); return; }
   refreshViewPane();
   if (sky3d.loading) return;
@@ -1488,6 +1499,7 @@ function enterThree() {
   sky3d.on = true; dom.sky3d.hidden = false; dom.sky.classList.add('three');
   sky3d.api.resize(view.w, view.h, view.dpr); sky3d.api.setQuality(perf.quality);
   sky3d.api.rig.setMode(cam.auto ? 'overview' : 'manual'); sky3d.api.rig.cutNext();
+  if (sky3d.wantSurface) { sky3d.wantSurface = false; syncFitBtn(); markLayout(); invalidate(); standOn(); return; }
   say('three', (coarse() ? 'Drag to turn the view, pinch to zoom, and double-tap a body to follow it.' : 'Drag to turn the view, scroll to zoom, and double-click a body to follow it.')
     + ' The orbits stay in one plane; only the camera moves.', true, { now: true, hint: true });
   syncFitBtn(); markLayout(); invalidate();
@@ -1495,13 +1507,46 @@ function enterThree() {
 function leaveThree() {
   if (!sky3d.on) return;
   /* The spheres and their compiled shaders are kept for a quick return; the next 3D frame drops anything stale. */
+  leaveSurface({ quiet: true }); sky3d.wantSurface = false;
   sky3d.on = false; dom.sky3d.hidden = true; dom.sky.classList.remove('three');
   cam.cut = true; cam.inited = false; syncFitBtn(); markLayout(); invalidate();
   dropHint();                               // a 3D how-to line means nothing on the flat chart
 }
-function syncFitBtn() { dom.fitBtn.hidden = sky3d.on ? sky3d.api.rig.mode === 'overview' : cam.auto; }
+function syncFitBtn() {
+  dom.compassBtn.hidden = !sky3d.on || onSurface();
+  dom.fitBtn.hidden = onSurface() || (sky3d.on ? sky3d.api.rig.mode === 'overview' : cam.auto);
+  const w = standable();
+  dom.standBtn.hidden = !w || sky3d.failed || place.on;
+  if (w) dom.standBtn.lastChild.textContent = onSurface() ? 'Back to orbit' : 'Stand on ' + nameOf(w);
+}
+/* ---- standing on a world: the same simulation seen from the ground of the world the page follows */
+const onSurface = () => sky3d.on && sky3d.api.surface.id !== null;
+function standable() {                      // the world to stand on: the one being stood on, the followed world, the selected one, any planet
+  if (onSurface()) return bodyById(world.cur, sky3d.api.surface.id) || null;
+  const ok = b => b && (b.kind === 'planet' || b.kind === 'moon');
+  const civ = world.civ && !world.civ.over ? bodyById(world.cur, world.civ.id) : null, sel = bodyById(world.cur, world.sel);
+  return [civ, sel].find(ok) || world.cur.find(b => b.kind === 'planet') || null;
+}
+const ground = { say: false, up: new Set(), lastSky: -1e9 };
+function standOn(opts) {
+  const w = standable(); if (!w || sky3d.failed) return;
+  if (onSurface() && sky3d.api.surface.id === w.id && !(opts && opts.again)) return;   // already here
+  if (!sky3d.on) { sky3d.wantSurface = true; setViewMode('3d'); return; }   // the 3D view arrives first, then the ground
+  if (place.on) exitPlacing(false);
+  sky3d.api.rig.setMode('follow', w.id); sky3d.api.standOn(w.id); world.sel = w.id; bodiesDirty = true;
+  ground.say = true; ground.up.clear(); ground.lastSky = -1e9;
+  dom.scale.hidden = true; refreshChrome(); refreshViewPane(); syncFitBtn(); invalidate();
+}
+function leaveSurface(opts) {
+  if (!onSurface()) return;
+  sky3d.api.leaveSurface(); dom.scale.hidden = false; ground.say = false;
+  if (!(opts && opts.quiet)) dropHint();
+  refreshChrome(); refreshViewPane(); syncFitBtn(); markLayout(); invalidate();
+}
+const toggleSurface = () => (onSurface() ? leaveSurface() : standOn());
 function followBody(id) {
   if (!sky3d.on) return;
+  leaveSurface({ quiet: true });
   sky3d.api.rig.setMode('follow', id); world.sel = id; bodiesDirty = true;
   const b = bodyById(world.cur, id);
   if (b) say('follow', 'Following ' + nameOf(b) + '. Press F, or ' + (coarse() ? 'double-tap' : 'double-click') + ' empty sky, to see everything again.', true, { now: true, hint: true });
@@ -1805,7 +1850,9 @@ function resetRun(opts) {
   if (!bodyById(world.cur, world.sel)) world.sel = world.cur[0].id;
   computeForecast(!!opts.quick);
   if (opts.snap) { cam.inited = false; if (sky3d.api) sky3d.api.rig.cutNext(); }
-  if (!opts.keepCamera) setAuto(true);
+  /* a new run starts from the overview, unless you are standing on a world that is still there: then you stay, and
+   * arrive afresh, with the new run's sky */
+  if (!opts.keepCamera) { if (onSurface() && bodyById(world.cur, sky3d.api.surface.id)) standOn({ again: true }); else setAuto(true); }
   if (!opts.keepCaption) setCaption(baseCaption());
   refreshChrome(); refreshBodies(); invalidate();
 }
@@ -1823,7 +1870,10 @@ function loadPreset(i, opts) {
   world.vRef = Math.max(v, 0.6 * Math.sqrt(M / R0));
   world.arrowK = 56 / world.vRef;
   store.set('preset', world.preset.id);
+  /* standing when the setup changes: stand on the new setup's own world, or go back to space if it has none */
+  const standing = onSurface(); if (standing) { sky3d.api.leaveSurface(); dom.scale.hidden = false; }
   resetRun({ snap: opts.snap !== false });
+  if (standing) { if (standable()) standOn(); else refreshViewPane(); }
 }
 function restart() { resetRun({}); }
 function setHash(h) { try { history.replaceState(null, '', location.pathname + location.search + (h ? '#' + h : '')); } catch (e) { /* not every host allows it */ } }
@@ -2162,7 +2212,7 @@ const dom = {};
 ['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'captionLive', 'announce', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
   'context', 'undoBtn', 'resetBtn', 'skyBtn', 'skyPill', 'skiesSheet', 'skyGrid', 'seedForm', 'seedInput', 'planetBtn', 'eraOut', 'eraLbl', 'eraStrip', 'historySheet', 'histBody', 'histCanvas', 'histTip', 'histLegend', 'histStats', 'histLog', 'fitBtn', 'transport', 'restartBtn', 'playBtn', 'playIcon', 'slowerBtn', 'fasterBtn', 'speedOut', 'scrim',
   'presetSheet', 'presetGrid', 'customSheet', 'scienceSheet', 'sciBody', 'sheetPlay', 'sheetPlayIcon', 'sheetRestart', 'bodyChips', 'massRange', 'massVal',
-  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields', 'gridRow'].forEach(id => { dom[id] = $(id); });
+  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'standBtn', 'compassBtn', 'compassIc', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields', 'gridRow'].forEach(id => { dom[id] = $(id); });
 dom.readouts = document.querySelector('.readouts');
 const ctx = dom.sky.getContext('2d');
 const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -2301,6 +2351,7 @@ const sy = y => view.cy - (y - cam.y) * cam.scale;
 const wx = px => cam.x + (px - view.cx) / cam.scale;
 const wy = py => cam.y - (py - view.cy) / cam.scale;
 function setAuto(on) {
+  if (on) leaveSurface({ quiet: true });
   cam.auto = on; cam.cut = true; cam.vx = cam.vy = cam.vs = 0;
   if (sky3d.on) { sky3d.api.rig.setMode(on ? 'overview' : 'manual'); if (on) sky3d.api.rig.touch(); refreshViewPane(); }
   syncFitBtn(); markLayout();
@@ -2355,7 +2406,7 @@ function updateCamera(dt) {
     }
     const moved = sky3d.api.updateCamera({ dt, points: rig.mode === 'overview' ? fitPoints() : null, follow, followDefault, minHalf: 0.2 * world.S0,
       safe: view.safe, pad: world.playing ? 34 : 46, playing: world.playing && !document.hidden, reduced: reducedMotion, hold: holding });
-    if (moved) invalidate(200);
+    if (sky3d.api.updateSurface(dt, reducedMotion) || moved) invalidate(200);
     return;
   }
   if (!cam.auto || holding) { cam.inited = true; return; }
@@ -2634,7 +2685,7 @@ function drawEvents() {
 /* Marks keep off the text on the chart: the caption, the readouts, the scale and the chips. Measured only on a frame
  * that has a mark to place. */
 function clearOfText(X, Y, s, m) {
-  const boxes = [dom.captionBtn, dom.readouts, dom.scale, dom.context].map(boxOf).filter(Boolean);
+  const boxes = [dom.captionBtn, dom.readouts, dom.scale, dom.context, dom.compassBtn].map(boxOf).filter(Boolean);
   for (let pass = 0; pass < 3; pass++) {
     const b = boxes.find(r => X > r.left - 8 && X < r.right + 8 && Y > r.top - 8 && Y < r.bottom + 8);
     if (!b) break;
@@ -2662,6 +2713,86 @@ function drawEdgeMarks() {                 // a body out of view leaves a marker
     }
   }
 }
+/* ---- the overlay on the ground: a compass on the horizon, names in the sky, marks for suns out of view, and the story
+ * of the sky told as it changes */
+const DEG = Math.PI / 180, WIND_SHORT = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const WIND_NAMES = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+const windName = az => WIND_NAMES[Math.round(((az / (2 * Math.PI)) % 1 + 1) % 1 * 8) % 8];
+const isRealSun = s => s.flux >= 1e-3;      // a sun far enough away to be only a bright star does not make day or night
+const andList = names => (names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]);
+function asWide(r, thing) {                 // a size compared with a familiar one, in words
+  if (r >= 1.25) { const k = Math.round(r * 2) / 2; return (k === 2 ? 'twice' : trimZeros(k.toFixed(1)) + ' times') + ' as wide as ' + thing; }
+  return r >= 0.8 ? 'about as wide as ' + thing : r >= 0.4 ? 'about half as wide as ' + thing : r >= 0.2 ? 'about a quarter as wide as ' + thing : null;
+}
+function drawGround() {
+  const api = sky3d.api, info = api.surface.info;
+  if (!info) return;
+  const w = bodyById(world.cur, info.id); if (!w) return;
+  tellGround(info, w);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  for (let k = 0; k < 8; k++) {             // the compass: letters just under the horizon, where the ground is
+    const p = api.horizonPoint(k * Math.PI / 4); if (!p || p.x < -30 || p.x > view.w + 30) continue;
+    const major = k % 2 === 0, y = Math.min(p.y + 16, view.safe.b - 10);
+    ctx.font = (major ? '600 13px ' : '500 11px ') + theme.fontUI;
+    ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.55); ctx.strokeText(WIND_SHORT[k], p.x, y);
+    ctx.fillStyle = inkA(major ? 0.85 : 0.55); ctx.fillText(WIND_SHORT[k], p.x, y);
+  }
+  const s0 = view.safe, m = 16, look = api.surface.look;
+  for (const s of info.suns.concat(info.worlds)) {
+    const sun = info.suns.includes(s), b = bodyById(world.cur, s.id); if (!b) continue;
+    const p = api.skyPoint(s.id), on = p && p.x > 0 && p.x < view.w && p.y > 0 && p.y < view.h;
+    if (on && ui.view.labels && s.alt > -1 * DEG) {
+      ctx.font = '600 12px ' + theme.fontUI; ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.8);
+      const ly = p.y - (sun ? 22 : 14); ctx.strokeText(capName(b), p.x, ly); ctx.fillStyle = rgba(colorOf(b), 1); ctx.fillText(capName(b), p.x, ly);
+    }
+    if (on || !sun || !isRealSun(s) || s.alt <= 0) continue;
+    /* a sun that is up but out of view leaves a mark at the edge it lies beyond */
+    let X, Y;
+    if (p) { X = clamp(p.x, s0.l + m, s0.r - m); Y = clamp(p.y, s0.t + m, s0.b - m); }
+    else { let d = s.az - look.az; d -= 2 * Math.PI * Math.round(d / (2 * Math.PI)); X = d < 0 ? s0.l + m : s0.r - m; Y = clamp(view.h * 0.45, s0.t + m, s0.b - m); }
+    [X, Y] = clearOfText(X, Y, s0, m);
+    const tx = p ? p.x : X + (X < view.w / 2 ? -100 : 100), ty = p ? p.y : Y, a = Math.atan2(ty - Y, tx - X);
+    ctx.fillStyle = rgba(colorOf(b), 1); ctx.beginPath();
+    ctx.moveTo(X + 9 * Math.cos(a), Y + 9 * Math.sin(a)); ctx.lineTo(X + 6 * Math.cos(a + 2.3), Y + 6 * Math.sin(a + 2.3)); ctx.lineTo(X + 6 * Math.cos(a - 2.3), Y + 6 * Math.sin(a - 2.3)); ctx.closePath(); ctx.fill();
+  }
+}
+/* The sky's story: where everything is on arrival, then each sunrise and sunset, never more than one line in eight
+ * seconds so the civilizations' own captions keep their place. */
+function tellGround(info, w) {
+  const real = info.suns.filter(isRealSun), sunOf = s => bodyById(world.cur, s.id), now = performance.now();
+  if (ground.say) {
+    ground.say = false; ground.up = new Set(real.filter(s => s.alt > 0).map(s => s.id));
+    const deg = s => Math.max(0, Math.round(s.alt / DEG)), locked = !!(w.meta && w.meta.locked);
+    const up = real.filter(s => s.alt > 0), down = real.filter(s => s.alt <= 0), farUp = info.suns.filter(s => !isRealSun(s) && s.alt > 0);
+    let text = 'Standing on ' + (info.gas ? nameOf(w) + '’s cloud tops' : nameOf(w)) + ', 30° north. ';
+    if (locked && real.length && real[0].alt > 0) text += capName(sunOf(real[0])) + ' hangs ' + Math.max(1, deg(real[0])) + '° up in the ' + windName(real[0].az) + ' and never moves: this world keeps one face to it.';
+    else {
+      const parts = up.map(s => nameOf(sunOf(s)) + (deg(s) < 1 ? ' is on the horizon in the ' : ' is ' + deg(s) + '° up in the ') + windName(s.az));
+      if (down.length) parts.push(andList(down.map(s => nameOf(sunOf(s)))) + (down.length > 1 ? ' are' : ' is') + ' below the horizon');
+      text += parts.length ? parts.join('; ').replace(/^./, c => c.toUpperCase()) + '.' : '';
+    }
+    if (farUp.length) { const names = andList(farUp.map(s => nameOf(sunOf(s)))); text += ' ' + names[0].toUpperCase() + names.slice(1) + (farUp.length > 1 ? ' shine as bright stars.' : ' shines as a bright star.'); }
+    say('ground', text.trim(), true, { now: true });
+    if (info.gas) say('groundGas', capName(w) + ' is ' + trimZeros(info.radiusEarth.toFixed(1)) + ' times as wide as Earth: probably deep gas with no ground at all, so this is the view from above its clouds.', true);
+    const big = real[0] && asWide(real[0].angR / 0.004652, 'the Sun from Earth');
+    const near = info.worlds.slice().sort((p, q) => q.angR - p.angR)[0], nearWord = near && asWide(near.angR / 0.004521, 'the Moon from Earth');
+    if (big && !/^about as wide/.test(big)) say('groundSize', capName(sunOf(real[0])) + ' looks ' + big + '.', true);
+    else if (nearWord) say('groundSize', capName(sunOf(near)) + ' looks ' + nearWord + '.', true);
+    say('groundHow', coarse() ? 'Drag to look around and pinch to zoom. Back to orbit returns you to space.' : 'Drag to look around and scroll to zoom. Press G, or Back to orbit, to return to space.', true);
+    ground.lastSky = now; return;
+  }
+  for (const s of real) {
+    const was = ground.up.has(s.id);
+    let event = null;
+    if (!was && s.alt > 0.5 * DEG) { ground.up.add(s.id); event = 'rise'; } else if (was && s.alt < -0.5 * DEG) { ground.up.delete(s.id); event = 'set'; }
+    if (!event || now - ground.lastSky < 8000 || !world.playing) continue;
+    ground.lastSky = now;
+    const n = ground.up.size, name = capName(sunOf(s));
+    const text = event === 'rise' ? name + ' rises in the ' + windName(s.az) + (n > 1 ? ': ' + ['', '', 'two', 'three', 'four'][Math.min(n, 4)] + ' suns in the sky.' : '.')
+      : name + ' sets in the ' + windName(s.az) + (n === 0 ? '. Night.' : '.');
+    say('sky', text, true, { group: 'sky', replaces: 'sky' });
+  }
+}
 function drawDragLabel() {
   if (drag.mode !== 'body' && drag.mode !== 'vel') return;
   const q = bodyById(world.cur, drag.id); if (!q) return;
@@ -2682,8 +2813,18 @@ function render(now, dt) {
   layoutBodies(dt);
   if (sky3d.on) {
     sky3d.api.setQuality(perf.quality);
+    if (onSurface() && sky3d.api.surface.lost) {
+      leaveSurface({ quiet: true }); setAuto(true);
+      say('groundLost', 'There is no ground left to stand on: the world is gone.', true, { now: true });
+    }
+    const standing = onSurface();
+    if (!standing) {                        // the compass needle follows the camera's heading
+      const deg = Math.round(sky3d.api.rig.cur.theta * 180 / Math.PI);
+      if (deg !== view.compassDeg) { view.compassDeg = deg; dom.compassIc.style.transform = 'rotate(' + deg + 'deg)'; }
+    }
     sky3d.api.render({ bodies: world.cur, drawn, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
       climates: visuals.climates, spinTime: visuals.spinTime, quality: perf.quality, colorOf: b => colorOf(b) });
+    if (standing) { drawGround(); return; }  // from the ground the chart's furniture means nothing: a compass and the sky's names instead
     if (paused && ui.view.forecast) drawForecast();
     if (ui.view.com) drawCOM();
     drawBodyOverlays(paused);
@@ -2777,7 +2918,8 @@ function refreshChrome() {
   dom.skyBtn.hidden = !world.preset.skies;
   const showSky = !!world.preset.skies && world.sky.key !== 'default';
   dom.skyPill.hidden = !showSky; if (showSky) dom.skyPill.textContent = 'sky: ' + world.sky.name;
-  dom.planetBtn.hidden = world.ic.some(b => b.kind === 'planet') || world.ic.length === 0 || world.ic.length > 4;
+  dom.planetBtn.hidden = onSurface() || world.ic.some(b => b.kind === 'planet') || world.ic.length === 0 || world.ic.length > 4;
+  syncFitBtn();
   dom.resetBtn.setAttribute('aria-label', 'Reset to ' + world.preset.name); dom.resetBtn.title = 'Reset to ' + world.preset.name;
   refreshSpeed(); markLayout();
 }
@@ -2929,7 +3071,10 @@ function refreshViewPane() {
   dom.cameraFields.hidden = !sky3d.on; dom.gridRow.hidden = sky3d.on;   // the 3D sky has no grid: the crosses read as a pattern over the scene
   if (sky3d.on) {
     const rig = sky3d.api.rig;              // after a zoom or a pan the camera is the viewer's own: neither choice is current
-    radios(dom.cameraSeg, b => b.dataset.v === rig.mode);
+    radios(dom.cameraSeg, b => (onSurface() ? b.dataset.v === 'surface' : b.dataset.v === rig.mode));
+    const stand = dom.cameraSeg.querySelector('[data-v="surface"]');
+    if (standable()) stand.removeAttribute('aria-disabled'); else stand.setAttribute('aria-disabled', 'true');
+    dom.angleSeg.closest('.field').hidden = onSurface();   // on the ground the head turns; the orbit camera's angles wait
     radios(dom.angleSeg, b => Math.abs(+b.dataset.v - rig.goal.phi) < 0.03);
   }
   document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-checked', String(!!ui.view[b.dataset.view])));
@@ -3166,6 +3311,7 @@ function renderScience() {
     + '<li><strong>Real.</strong> Newton’s law of gravity, with every body pulling on every other. Close passes are not softened or fudged. Masses are in Suns, distances in AU (1 AU is the distance from the Earth to the Sun, about 150 million km), and the clock runs in years.</li>'
     + '<li><strong>Flat.</strong> Everything moves in one plane. Real systems are three-dimensional, but the mathematics and the chaos are the same.</li>'
     + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them. When two come close on screen, their discs shrink rather than hide each other; in 3D a sphere instead stops growing as it nears a neighbour.</li>'
+    + '<li><strong>On the surface.</strong> Standing on a world, the sky is computed from the simulation: each sun’s direction, its brightness, and its real width from its published radius (or, where none is measured, from its mass). Bodies too small to see are drawn as points. The observer stands at 30° north. Earth keeps its own day; a world whose spin is not known is given a day a thirtieth of its year, and a tidally locked world has no day, so its sun stands still. While you stand on a world, time slows so that a day lasts about eight seconds at 1×. The air and the ground are drawn to match the climate, not computed.</li>'
     + '<li><strong>Collisions.</strong> Each star is treated as a compact ball. A 1-Sun body is about 15,000 km in radius here, roughly twice the size of a white dwarf star and nearly 50 times smaller than the real Sun. Two bodies that touch merge into one. Mass and momentum are kept, and the energy of the crash is assumed to leave as heat. There is no relativity and no loss of mass.</li>'
     + '<li><strong>Worlds.</strong> A body lighter than 0.05 Suns is a world rather than a star, and worlds meet stars at their real sizes: a planet is swallowed when it reaches a star’s true surface. Closer than about 1.5 times that, inside what astronomers call the Roche limit, a star’s tides tear a world apart. Here a tenth of it is lost as debris, which gathers into a moon once the world is far enough from the stars for the moon to hold. A world’s temperature is what it receives from every sun, with a star’s brightness rising steeply with its mass and falling with the square of distance, smoothed over about three months as oceans and air would do. The civilizations are a story told on top of the physics: one begins after a year of calm, and ends when the planet leaves the range from about −38 °C to 47 °C, or when the planet itself is torn, swallowed or thrown out.</li>'
     + '<li><strong>Real systems.</strong> The one-, two- and three-sun systems use published masses, brightnesses and orbits, cited in each system’s notes. A sun that carries a measured brightness shines by it instead of the mass rule, and a world so close to its sun that the tides have locked it keeps one face to that sun. Where no planet is known, as at Alpha Centauri, a placed world is labelled as such. Distant companions that cannot move the planet are left out or, at Gliese 667, kept 230 AU away beyond the edge of the view.</li>'
@@ -3200,23 +3346,26 @@ function hitTest(x, y, slop) {
 }
 function pinchState() {
   const p = [...drag.pointers.values()];
-  return { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+  return { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2, a: Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x) };
 }
 function onDown(e) {
-  if (e.button > 0) return;
+  if (e.button > 2) return;
+  /* in 3D the right or middle button slides the view (as Shift does); on the flat chart only the main button acts */
+  if (e.button > 0 && !sky3d.on) return;
   try { dom.sky.setPointerCapture(e.pointerId); } catch (err) { /* synthetic events */ }
+  if (e.button > 0) e.preventDefault();      // no middle-button autoscroll
   drag.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (drag.pointers.size === 2) {
     if (drag.mode === 'body' || drag.mode === 'vel') return;
     drag.mode = 'pinch'; drag.pinch = pinchState(); if (!sky3d.on) setAuto(false); return;   // in 3D the rig decides: a pinch leaves overview but keeps following
   }
   if (drag.pointers.size > 2) return;
-  drag.sx = e.clientX; drag.sy = e.clientY; drag.moved = false; drag.primary = e.pointerId;
+  drag.sx = e.clientX; drag.sy = e.clientY; drag.moved = false; drag.primary = e.pointerId; drag.slide = e.button > 0;
   drag.slop = e.pointerType === 'mouse' ? 3 : 7;
-  drag.hit = place.on ? null : hitTest(e.clientX, e.clientY, e.pointerType === 'mouse' ? 0 : 6);
+  drag.hit = place.on || onSurface() ? null : hitTest(e.clientX, e.clientY, e.pointerType === 'mouse' ? 0 : 6);
   /* While a 3D sky plays, a drag that starts on a body still turns the camera, and a double-tap still follows it: only a
    * paused sky hands its bodies to the finger. The flat chart pauses on a press, as it always has. */
-  drag.grab = !!drag.hit && !(sky3d.on && world.playing);
+  drag.grab = !!drag.hit && !drag.slide && !(sky3d.on && world.playing);
   drag.mode = 'pending';
   if (drag.hit && drag.hit.type === 'body') {
     world.sel = drag.hit.id; bodiesDirty = true;
@@ -3228,15 +3377,19 @@ function onMove(e) {
   const p = drag.pointers.get(e.pointerId);
   if (place.on) { const w = unproj(e.clientX, e.clientY); place.hover = !!w; if (w) { place.x = w[0]; place.y = w[1]; } invalidate(); }
   if (!p) {                                 // hovering with a mouse: show what can be grabbed
-    if (e.pointerType === 'mouse' && !place.on) dom.sky.classList.toggle('over-body', !!hitTest(e.clientX, e.clientY, 0));
+    if (e.pointerType === 'mouse' && !place.on) dom.sky.classList.toggle('over-body', !onSurface() && !!hitTest(e.clientX, e.clientY, 0));
     return;
   }
   const px = p.x, py = p.y; p.x = e.clientX; p.y = e.clientY;
   if (drag.mode === 'pinch' && drag.pointers.size >= 2) {
     const a = drag.pinch, b = pinchState();
+    if (onSurface()) { sky3d.api.lookZoom(a.d / Math.max(b.d, 1)); sky3d.api.lookDrag(b.x - a.x, b.y - a.y); drag.pinch = b; invalidate(); return; }
     if (sky3d.on) {
       const was = sky3d.api.rig.mode;
-      sky3d.api.dollyAt(a.d / Math.max(b.d, 1), b.x, b.y); sky3d.api.panAt(a.x, a.y, b.x, b.y); drag.pinch = b;
+      sky3d.api.dollyAt(a.d / Math.max(b.d, 1), b.x, b.y); sky3d.api.panAt(a.x, a.y, b.x, b.y);
+      let turn = b.a - a.a; turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));   // a twist of two fingers turns the view with them
+      if (Math.abs(turn) < 0.5) sky3d.api.rig.turn(turn);
+      drag.pinch = b;
       if (sky3d.api.rig.mode !== was) { syncFitBtn(); refreshViewPane(); }
       invalidate(); return;
     }
@@ -3265,7 +3418,8 @@ function onMove(e) {
   if (drag.mode === 'pan') {
     if (sky3d.on) {                         // a drag turns the camera; with Shift it slides the view across the plane
       const now = performance.now(), dtm = Math.max(1, now - drag.vt), dx = e.clientX - px, dy = e.clientY - py, was = sky3d.api.rig.mode;
-      if (e.shiftKey) sky3d.api.panAt(px, py, e.clientX, e.clientY); else sky3d.api.rig.orbit(dx, dy, view.h);
+      if (onSurface()) sky3d.api.lookDrag(dx, dy);  // on the ground a drag turns the head: the sky follows the finger
+      else if (e.shiftKey || drag.slide) sky3d.api.panAt(px, py, e.clientX, e.clientY, true); else sky3d.api.rig.orbit(dx, dy, view.h);
       drag.fvx = drag.fvx * 0.5 + (dx / dtm * 1000) * 0.5; drag.fvy = drag.fvy * 0.5 + (dy / dtm * 1000) * 0.5; drag.vt = now;
       if (sky3d.api.rig.mode !== was) { syncFitBtn(); refreshViewPane(); }
       invalidate(); return;
@@ -3291,13 +3445,18 @@ function onUp(e) {
   if (drag.mode === 'pinch') { if (drag.pointers.size < 2) { drag.mode = drag.pointers.size ? 'pan' : null; const r = [...drag.pointers.keys()][0]; if (r !== undefined) drag.primary = r; } if (!drag.pointers.size) dom.sky.classList.remove('grabbing'); return; }
   if (e.pointerId !== drag.primary) return;
   const mode = drag.mode; drag.mode = null; dom.sky.classList.remove('grabbing');
-  if (mode === 'pan' && sky3d.on && !e.shiftKey && !reducedMotion && performance.now() - drag.vt < 90) sky3d.api.rig.fling(clamp(drag.fvx, -3000, 3000), clamp(drag.fvy, -3000, 3000), view.h);
+  if (mode === 'pan' && sky3d.on && !e.shiftKey && !drag.slide && !reducedMotion && performance.now() - drag.vt < 90) {
+    const vx = clamp(drag.fvx, -3000, 3000), vy = clamp(drag.fvy, -3000, 3000);
+    if (onSurface()) sky3d.api.lookFling(vx, vy); else sky3d.api.rig.fling(vx, vy, view.h);
+  }
   if (mode === 'body' || mode === 'vel') { commitEdit(false); const q = bodyById(world.ic, drag.id); if (q) sayValue(mode, q); }
   else if (mode === 'pending' && e.type === 'pointerup' && place.on) { const w = unproj(e.clientX, e.clientY); if (w) placeAt(w[0], w[1]); }
-  else if (mode === 'pending' && e.type === 'pointerup') {
+  else if (mode === 'pending' && e.type === 'pointerup' && !drag.slide) {   // a right-button click is not a tap
     const now = performance.now();
     const again = now - drag.lastTap < 340 && Math.hypot(e.clientX - drag.tapX, e.clientY - drag.tapY) < 32;
-    if (!drag.hit) {
+    if (onSurface()) {                      // a double-tap on something in the sky turns to face it
+      if (again) { faceSkyAt(e.clientX, e.clientY); drag.lastTap = 0; } else { drag.lastTap = now; drag.tapX = e.clientX; drag.tapY = e.clientY; }
+    } else if (!drag.hit) {
       if (again) { setAuto(true); drag.lastTap = 0; }
       else { drag.lastTap = now; drag.tapX = e.clientX; drag.tapY = e.clientY; }
     } else if (sky3d.on && drag.hit.type === 'body') {   // a second tap on a body follows it
@@ -3307,9 +3466,16 @@ function onUp(e) {
   }
   invalidate();
 }
+function faceSkyAt(x, y) {
+  const info = sky3d.api.surface.info; if (!info) return;
+  let best = null, bd = 44;
+  for (const s of info.suns.concat(info.worlds)) { const p = sky3d.api.skyPoint(s.id); if (!p) continue; const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = s; } }
+  if (best) { sky3d.api.surface.look.face(best.az, best.alt); invalidate(); }
+}
 function onWheel(e) {
   e.preventDefault();
   const k = Math.exp(-clamp(e.deltaY, -240, 240) * (e.ctrlKey ? 0.01 : 0.0022));
+  if (onSurface()) { sky3d.api.lookZoom(1 / k); invalidate(); return; }
   if (sky3d.on) { sky3d.api.dollyAt(1 / k, e.clientX, e.clientY); syncFitBtn(); refreshViewPane(); invalidate(); return; }
   const X = wx(e.clientX), Y = wy(e.clientY);
   cam.scale = clamp(cam.scale * k, 0.02, 2e5);
@@ -3375,7 +3541,12 @@ function wire() {
   });
   dom.trailSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.view.trails = b.dataset.v; store.set('view', ui.view); refreshViewPane(); invalidate(); });
   dom.modeSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.v === '3d' && sky3d.failed) { say('no3d', NO_3D, true, { now: true }); return; } setViewMode(b.dataset.v); });
-  dom.cameraSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; if (b.dataset.v === 'follow') followBody(world.sel); else setAuto(true); });
+  dom.cameraSeg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !sky3d.on) return;
+    if (b.dataset.v === 'surface') { if (!b.hasAttribute('aria-disabled')) standOn(); } else if (b.dataset.v === 'follow') followBody(world.sel); else setAuto(true);
+  });
+  dom.standBtn.addEventListener('click', toggleSurface);
+  dom.compassBtn.addEventListener('click', () => { if (!sky3d.on || onSurface()) return; sky3d.api.rig.resetAngle(); refreshViewPane(); invalidate(); });
   dom.angleSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; sky3d.api.rig.setTilt(+b.dataset.v); refreshViewPane(); invalidate(); });
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.view; ui.view[k] = !ui.view[k]; store.set('view', ui.view); refreshViewPane(); invalidate();
@@ -3392,7 +3563,7 @@ function wire() {
   window.addEventListener('keydown', e => {
     if (e.defaultPrevented) return;
     const k = e.key;
-    if (k === 'Escape') { if (ui.sheet) { closeSheet(); e.preventDefault(); } else if (place.on) { exitPlacing(true); e.preventDefault(); } return; }
+    if (k === 'Escape') { if (ui.sheet) { closeSheet(); e.preventDefault(); } else if (place.on) { exitPlacing(true); e.preventDefault(); } else if (onSurface()) { leaveSurface(); e.preventDefault(); } return; }
     const t = e.target, typing = t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'range'));
     const modal = ui.sheet && SHEETS[ui.sheet].modal;
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k.toLowerCase() === 'z') { if (typing || modal) return; undo(); e.preventDefault(); return; }
@@ -3402,9 +3573,21 @@ function wire() {
     const onControl = t && t.closest && t.closest('button, input, summary, a, [tabindex="0"]'), keyed = !!onControl && onControl.matches(':focus-visible');
     if (k === ' ' || k === 'Spacebar') { if (typing || keyed) return; if (!e.repeat) setPlaying(!world.playing); e.preventDefault(); return; }
     if (typing) return;
-    if (sky3d.on && !keyed) {           // turning, tilting and zooming the 3D camera
-      const rig = sky3d.api.rig, step = Math.PI / 12; let used = true;
-      if (k === 'ArrowLeft') rig.nudge(step, 0); else if (k === 'ArrowRight') rig.nudge(-step, 0);
+    if (onSurface() && !keyed) {           // on the ground the keys turn the head and zoom the eye
+      const look = sky3d.api.surface.look, base = look.goal || look; let used = true;
+      if (k === 'ArrowLeft') look.face(base.az - 15 * DEG, base.alt); else if (k === 'ArrowRight') look.face(base.az + 15 * DEG, base.alt);
+      else if (k === 'ArrowUp') look.face(base.az, base.alt + 8 * DEG); else if (k === 'ArrowDown') look.face(base.az, base.alt - 8 * DEG);
+      else if (k === '[') sky3d.api.lookZoom(1.25); else if (k === ']') sky3d.api.lookZoom(0.8);
+      else used = false;
+      if (used) { invalidate(); e.preventDefault(); return; }
+    }
+    if (sky3d.on && !keyed && !onSurface()) {           // turning, tilting and zooming the 3D camera
+      const rig = sky3d.api.rig, step = Math.PI / 12, cx = view.w / 2, cy = view.h / 2, was = rig.mode; let used = true;
+      if (e.shiftKey && k.startsWith('Arrow')) {   // Shift and an arrow slide the view across the plane
+        const d = Math.min(view.w, view.h) * 0.12, [ddx, ddy] = { ArrowLeft: [d, 0], ArrowRight: [-d, 0], ArrowUp: [0, d], ArrowDown: [0, -d] }[k];
+        sky3d.api.panAt(cx, cy, cx + ddx, cy + ddy, true);
+        if (rig.mode !== was) refreshViewPane();
+      } else if (k === 'ArrowLeft') rig.nudge(step, 0); else if (k === 'ArrowRight') rig.nudge(-step, 0);
       else if (k === 'ArrowUp') rig.nudge(0, -step / 2); else if (k === 'ArrowDown') rig.nudge(0, step / 2);
       else if (k === '[') rig.dolly(1.25); else if (k === ']') rig.dolly(0.8);
       else if (k === '1') rig.setTilt(0.06); else if (k === '2') rig.setTilt(0.95); else if (k === '3') rig.setTilt(1.38);
@@ -3412,7 +3595,8 @@ function wire() {
       if (used) { syncFitBtn(); refreshViewPane(); invalidate(); e.preventDefault(); return; }
     }
     const c = k.toLowerCase();
-    if (e.repeat && /^[rfcvhs]$/.test(c)) { e.preventDefault(); return; }   // holding a key must not restart or flip the view over and over
+    if (e.repeat && /^[rfcvhsg]$/.test(c)) { e.preventDefault(); return; }
+    if (c === 'g') { if (standable()) toggleSurface(); e.preventDefault(); return; }   // holding a key must not restart or flip the view over and over
     if (c === 'r') restart(); else if (c === 'f') setAuto(true); else if (c === 'c') toggleSheet('custom'); else if (c === 'v') setViewMode(ui.view.mode === '3d' ? 'flat' : '3d');
     else if (c === 'h' && !dom.eraOut.hidden) toggleSheet('history'); else if (c === 's' && !dom.skyBtn.hidden) toggleSheet('skies');
     else if (k === '+' || k === '=') setSpeed(ui.speed + 1); else if (k === '-' || k === '_') setSpeed(ui.speed - 1); else return;
@@ -3465,13 +3649,15 @@ function frame(now) {
   if (!world.playing && now > dirtyUntil && !drag.mode && !(sky3d.on && sky3d.api.dirty)) return;      // nothing is changing: leave the last picture up
   tick(now, dt);
 }
+/* simulated time per second at 1×: the setup's own pace, or on the ground the world's day pace (never faster) */
+function playRate() { const r = onSurface() ? sky3d.api.surfaceRate() : null; return r ? Math.min(world.preset.rate, r) : world.preset.rate; }
 function tick(now, dt) {                   // one frame's worth of simulation and drawing
   const previousTime = world.t;
   if (world.playing) {
     perf.ema += (dt - perf.ema) * 0.05;
     if (perf.ema > 0.026) { if (++perf.bad > 150 && perf.quality < 2) { perf.quality++; perf.bad = 0; } } else if (perf.bad > 0) perf.bad--;
     drama.cur += (dramaTarget(now) - drama.cur) * (1 - Math.exp(-dt * 5));
-    const want = dt * SPEEDS[ui.speed] * world.preset.rate * drama.cur;
+    const want = dt * SPEEDS[ui.speed] * playRate() * drama.cur;
     const got = advance(world.t + want, clamp(15 - renderMs, 4, 10));
     accountThrottle(want, got - world.t, now);
     world.t = got;
@@ -3492,6 +3678,7 @@ function init() {
   readTheme(); wire(); resize(); measure();
   const askedView = new URLSearchParams(location.search).get('view');
   if (askedView === '3d' || askedView === 'flat') ui.view.mode = askedView;
+  else if (askedView === 'surface') { ui.view.mode = '3d'; sky3d.wantSurface = true; }   // a link straight to the ground
   else if (!ui.view.chosen) ui.view.mode = '3d';
   refreshViewPane();
   const saved = PRESETS.findIndex(p => p.id === store.get('preset', 'trisolaris'));
@@ -3506,7 +3693,7 @@ function init() {
   requestAnimationFrame(frame);
 }
 init();
-window.__threeBody = { world, ui, cam, view, drawn, sky3d, setViewMode, handleOf, throttle, insight, perf, drama, sx, sy, fitTarget, tick, visuals, eventEffects, bodyRenderer, climateTexture, resetVisuals };
+window.__threeBody = { world, ui, cam, view, drawn, sky3d, setViewMode, standOn, leaveSurface, choosePreset, setPlaying, PRESETS, handleOf, throttle, insight, perf, drama, sx, sy, fitTarget, tick, visuals, eventEffects, bodyRenderer, climateTexture, resetVisuals };
 
 })();
 

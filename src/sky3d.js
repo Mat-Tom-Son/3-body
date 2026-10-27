@@ -6,6 +6,8 @@ import { LineSegments2 } from '../vendor/LineSegments2.js';
 import { LineSegmentsGeometry } from '../vendor/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/LineMaterial.js';
 import { CameraRig, cameraOffset, climateTint, atmosphereTint, spinAngle, SPIN_PERIODS, STAR_PHASE, toneOf, clamp, TAU } from './sky3d-model.js';
+import { createSurfaceView } from './sky3d-surface.js';
+import { DEG, LATITUDE, R_EARTH_AU, localFrame, toLocal, altAz, starRadiusAU, worldRadiusAU, angularRadius, sunDaylight, skyDaylight, standingLongitude, spinFrame, solarDay, SkyLook } from './surface-model.js';
 
 const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200, LINE_PX = 1.8;
 const LUM = b => (b.meta && b.meta.lum != null ? b.meta.lum : Math.pow(b.m, 3.5));   // a published brightness when the body carries one
@@ -233,8 +235,8 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
   }
   /* Slide the view so that the point on the plane under (x0, y0) ends up under (x1, y1): a drag that pins the plane to the
    * finger at any tilt. Falls back to the rig's estimate when either point is above the horizon. */
-  function panAt(x0, y0, x1, y1) {
-    if (rig.mode === 'follow') return;
+  function panAt(x0, y0, x1, y1, leaveFollow) {
+    if (rig.mode === 'follow' && !leaveFollow) return;   // a pinch keeps following; a deliberate slide looks elsewhere
     const a = unproject(x0, y0), b = unproject(x1, y1);
     if (a && b) rig.shift(a[0] - b[0], -(a[1] - b[1])); else rig.pan(x1 - x0, y1 - y0, pxPerWorld);
     applyCamera(); invalidate();
@@ -308,7 +310,8 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
         }
       }
       const tr = trails && trails.get(b.id);
-      if (tr && trailMode !== 'off') {
+      if (surface.id !== null) a.line.visible = false;        // on the ground no trail is drawn: leave the buffers alone
+      else if (tr && trailMode !== 'off') {
         if (a.trailAt !== tNow || a.trailMode !== trailMode || a.themeStamp !== themeStamp || a.trailLen !== tr.len) {
           fillTrail(a, tr, b, rgb, trailMode, tNow, tMin); a.trailAt = tNow; a.trailMode = trailMode; a.themeStamp = themeStamp; a.trailLen = tr.len;
         }
@@ -316,14 +319,94 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
       } else a.line.visible = false;
     }
     for (const id of actors.keys()) if (!live.has(id)) dropActor(id);   // deleting the current entry while iterating a Map is safe
-    renderer.render(scene, camera);
+    if (surface.id === null || !renderSurface(frame)) renderer.render(scene, camera);
     if (dirty > 0) dirty--;
   }
+
+  /* ---------------------------------------------------------------- standing on a world */
+  /* The observer stands at 30° north on the sphere the orbital view draws, at a longitude chosen on arrival so the
+   * brightest sun is a little way up the morning sky; from then on the ground turns with that sphere. */
+  const surface = { id: null, lon: null, look: new SkyLook(), view: null, info: null, dirs: new Map(), lost: false, phase: 0, lastT: null, day: null };
+  function standOn(id) {
+    if (!surface.view) { surface.view = createSurfaceView({ renderer }); surface.view.setSize(view.w, view.h); }
+    surface.id = id; surface.lon = null; surface.lost = false; surface.info = null; surface.lastT = null; surface.day = null;
+    surface.look.fov = 70; invalidate();
+  }
+  /* While standing, time slows so a solar day (see solarDay) lasts about eight seconds at 1×, half a minute at the
+   * slowest speed. The day is worked out on arrival and again only if another sun becomes the host, so the pace does
+   * not wander from frame to frame. */
+  const DAY_SECONDS = 8;
+  function dayFor(b) {
+    const d = surface.day;
+    if (d && !d.locked) {
+      let host = null, bf = 0;
+      for (const q of stars) if (q !== b) { const f = LUM(q) / Math.max(1e-12, (q.x - b.x) ** 2 + (q.y - b.y) ** 2); if (f > bf) { bf = f; host = q; } }
+      if (host && host.id === d.host) return d;
+    } else if (d) return d;
+    const next = solarDay(b, stars, LUM);
+    if (next && !next.locked) next.rate = next.solar / DAY_SECONDS;
+    return next;
+  }
+  function leaveSurface() { surface.id = null; surface.info = null; surface.dirs.clear(); invalidate(); }
+  const flatDir = (from, to) => { const dx = to.x - from.x, dz = -(to.y - from.y), d = Math.hypot(dx, dz) || 1e-12; return { dir: [dx / d, 0, dz / d], d }; };
+  function renderSurface(frame) {
+    const { bodies, climates, colorOf } = frame;
+    const b = bodies.find(q => q.id === surface.id), a = actors.get(surface.id);
+    if (!b || !a) { surface.lost = true; return false; }
+    a.group.updateMatrixWorld(true);
+    surface.day = dayFor(b);
+    let axis, meridian;
+    if (!surface.day || surface.day.locked) { const e = a.mesh.matrixWorld.elements; axis = [e[4], e[5], e[6]]; meridian = [e[0], e[1], e[2]]; }
+    else {
+      if (surface.lastT === null) surface.phase = a.mesh.rotation.y;   // arriving: the ground starts where the sphere was
+      else if (frame.tNow > surface.lastT) surface.phase += surface.day.omega * (frame.tNow - surface.lastT);
+      surface.lastT = frame.tNow;
+      ({ axis, meridian } = spinFrame(surface.phase, a.mesh.rotation.z));
+    }
+    const lit = stars.filter(q => q !== b);
+    if (surface.lon === null) {               // arriving: stand where the brightest sun is up, and face it
+      let best = null, bf = -1;
+      for (const q of lit) { const { d } = flatDir(b, q), f = LUM(q) / (d * d); if (f > bf) { bf = f; best = q; } }
+      surface.lon = best ? standingLongitude(axis, meridian, LATITUDE, flatDir(b, best).dir) : 0;
+      if (best) { const { alt, az } = altAz(toLocal(flatDir(b, best).dir, localFrame(axis, meridian, LATITUDE, surface.lon))); surface.look.az = az; surface.look.alt = clamp(alt * 0.55 + 6 * DEG, 4 * DEG, 40 * DEG); }
+      surface.look.vaz = surface.look.valt = 0; surface.look.goal = null;
+    }
+    const basis = localFrame(axis, meridian, LATITUDE, surface.lon);
+    surface.dirs.clear();
+    const suns = lit.map(q => {
+      const { dir, d } = flatDir(b, q), flux = LUM(q) / (d * d), { alt, az } = altAz(toLocal(dir, basis));
+      surface.dirs.set(q.id, dir);
+      return { id: q.id, dir, d, alt, az, flux, angR: angularRadius(starRadiusAU(q), d), rgb: colorOf(q), daylight: sunDaylight(alt, flux) };
+    }).sort((p, q) => q.flux - p.flux);
+    const worlds = bodies.filter(q => q !== b && kindOf(q) !== 'star').map(q => {
+      const { dir, d } = flatDir(b, q), { alt, az } = altAz(toLocal(dir, basis));
+      let host = null, f = 0;
+      for (const s of stars) { const g = LUM(s) / Math.max(1e-12, (s.x - q.x) ** 2 + (s.y - q.y) ** 2); f += g; if (!host || g > host.g) host = { s, g }; }
+      surface.dirs.set(q.id, dir);
+      return { id: q.id, dir, d, alt, az, flux: f, angR: angularRadius(worldRadiusAU(q), d), rgb: colorOf(q), light: host ? flatDir(q, host.s).dir : [1, 0, 0] };
+    });
+    const daylight = skyDaylight(suns), climate = climates ? (climates.get(b.id) ?? 2) : 2;
+    const gas = b.kind === 'planet' && worldRadiusAU(b) > 2 * R_EARTH_AU;   // past the radius valley: deep air and no ground
+    surface.view.update({ basis, look: surface.look, suns, worlds, climate, atmo: atmosphereTint(climate), daylight, gas, seed: (b.id * 7919 + Math.round(b.m * 1e9)) >>> 0 });
+    surface.view.render();
+    surface.info = { id: b.id, suns, worlds, daylight, gas, radiusEarth: worldRadiusAU(b) / R_EARTH_AU };
+    return true;
+  }
+  /* screen positions for the page's overlay: a body by id, or a point of the horizon by azimuth */
+  function skyPoint(id) { const d = surface.dirs.get(id); return d && surface.view ? surface.view.projectDir(d) : null; }
+  function horizonPoint(az) { return surface.view ? surface.view.projectLocal(Math.sin(az), Math.cos(az), 0) : null; }
+  function lookDrag(dx, dy) { if (surface.view) { surface.look.drag(dx, dy, surface.look.fov / view.h); invalidate(); } }
+  function lookFling(vx, vy) { if (surface.view) surface.look.fling(vx, vy, surface.look.fov / view.h); }
+  function lookZoom(f) { surface.look.zoom(f); invalidate(); }
+  function updateSurface(dt, reduced) { return surface.id !== null && surface.look.update(dt, reduced); }
+  /* simulated time per second of playback at 1× while standing, or null to keep the setup's own pace */
+  const surfaceRate = () => (surface.id !== null && surface.day && !surface.day.locked ? surface.day.rate : null);
 
   /* ---------------------------------------------------------------- page-facing setup */
   function resize(w, h, dpr) {
     view.w = Math.max(1, w); view.h = Math.max(1, h); view.dpr = clamp(dpr || 1, 1, view.quality >= 2 ? 1 : 2);
     renderer.setPixelRatio(view.dpr); renderer.setSize(view.w, view.h, false);
+    if (surface.view) surface.view.setSize(view.w, view.h);
     camera.aspect = view.w / view.h;
     camera.setViewOffset(view.w, view.h, view.w / 2 - view.cx, view.h / 2 - view.cy, view.w, view.h); camera.updateProjectionMatrix();
     applyCamera(); invalidate();
@@ -344,10 +427,12 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
     clear(); canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored);
     for (const l of lights) { scene.remove(l); l.dispose(); }
     starfield.geometry.dispose(); starfield.material.dispose();
+    if (surface.view) surface.view.dispose();
     renderer.dispose(); sphere.dispose(); sphereLow.dispose(); for (const m of Object.values(maps)) m.dispose(); glowMap.dispose();
   }
 
   applyCamera();
   return { rig, camera, scene, renderer, resize, setQuality, setTheme, setCenter, project, unproject, dollyAt, panAt, updateCamera, render, clear, dispose,
-    sizeGain: b => SIZE_GAIN[kindOf(b)], get pxPerWorld() { return pxPerWorld; }, get dirty() { return dirty > 0; }, invalidate };
+    sizeGain: b => SIZE_GAIN[kindOf(b)], standOn, leaveSurface, surfaceRate, skyPoint, horizonPoint, lookDrag, lookFling, lookZoom, updateSurface,
+    get surface() { return surface; }, get pxPerWorld() { return pxPerWorld; }, get dirty() { return dirty > 0; }, invalidate };
 }
