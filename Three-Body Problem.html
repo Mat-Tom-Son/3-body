@@ -27,7 +27,8 @@
   --ink-2: rgba(14, 36, 64, .78);
   --ink-3: rgba(14, 36, 64, .55);
   --line: rgba(14, 36, 64, .2);
-  --line-strong: rgba(14, 36, 64, .45);
+  --line-strong: rgba(14, 36, 64, .55);
+  --edge: rgba(14, 36, 64, .55);   /* the outline that is a control's only boundary: 3:1 against the panel */
   --fill: rgba(14, 36, 64, .06);
   --fill-strong: rgba(14, 36, 64, .12);
   --glass: rgba(245, 248, 252, .82);
@@ -61,6 +62,7 @@
   --ink-3: rgba(234, 242, 250, .52);
   --line: rgba(234, 242, 250, .2);
   --line-strong: rgba(234, 242, 250, .48);
+  --edge: rgba(234, 242, 250, .42);
   --fill: rgba(234, 242, 250, .07);
   --fill-strong: rgba(234, 242, 250, .14);
   --glass: rgba(9, 26, 47, .7);
@@ -73,7 +75,7 @@
   --body-ink: #0B1E36;
   --world-cold: #CDE3F4;
   --world-mild: #45C9A6;
-  --world-hot: #9C3118;
+  --world-hot: #D2502C;
   --moon: #AEB9C6;
   --era-stable: #6F93B8;
   --era-chaotic: #F2B449;
@@ -120,13 +122,12 @@ button:disabled { opacity: .38; cursor: default; }
 #sky.three { background: transparent; }
 #sky.grabbing { cursor: grabbing; }
 #sky.placing { cursor: crosshair; }
-.chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 #sky.over-body { cursor: pointer; }
 
 /* ---------- chart furniture ---------- */
 #ui {
   position: absolute; top: 0; bottom: 0;
-  left: calc(env(safe-area-inset-left, 0px) + var(--inset-left, 0px));
+  left: env(safe-area-inset-left, 0px);
   right: max(env(safe-area-inset-right, 0px), var(--inset-right, 0px));
   pointer-events: none;
 }
@@ -159,7 +160,7 @@ button:disabled { opacity: .38; cursor: default; }
 #captionText { transition: opacity .25s; }
 #captionText.swap { opacity: 0; }
 body.customizing.bottom-sheet .caption { display: none; }
-@media (max-height: 520px) { body.customizing .caption, body.customizing .icon-btn .lbl { display: none; } body.customizing .icon-btn { padding: 0 11px; } }
+@media (max-height: 520px) { body.customizing .caption, body.customizing .icon-btn .lbl, body.customizing .era canvas { display: none; } body.customizing .icon-btn { padding: 0 11px; } }
 
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -175,10 +176,27 @@ body.customizing.bottom-sheet .caption { display: none; }
   text-shadow: 0 0 5px var(--halo), 0 0 2px var(--halo);
 }
 #civOut { color: var(--ink-2); }
-.era { display: inline-flex; align-items: center; gap: 7px; margin-top: 3px; font: italic 400 .8125rem/1 var(--font-sci); color: var(--ink-2); }
+#civOut .temp { display: inline-block; min-width: 6.4ch; text-align: right; }
+/* The era strip opens the history. It looks like a line of text, but its hit area is 44px tall: the padding is taken
+ * back by negative margins so the readouts keep their rhythm. */
+.era {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0 8px 0 8px; margin: -11px -8px -14px 0;
+  font: italic 400 .8125rem/1 var(--font-sci); color: var(--ink-2); pointer-events: auto; cursor: pointer; border-radius: 10px;
+}
 .era canvas { display: block; width: 96px; height: 6px; border-radius: 3px; background: var(--fill); }
-.era { pointer-events: auto; cursor: pointer; padding: 4px 0 4px 6px; margin: -1px 0 -4px; border-radius: 8px; }
 .era:hover { background: var(--fill); }
+/* A phone held upright: the title and Customize share the first row, the readouts become one status line beneath the
+ * title, and the caption gets the full width instead of a column squeezed beside the readouts. */
+@media (max-width: 479px) and (orientation: portrait) {
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start; }
+  .top-left, .top-right { display: contents; }
+  #presetBtn { grid-column: 1; grid-row: 1; justify-self: start; }
+  #customBtn { grid-column: 2; grid-row: 1; }
+  .readouts { grid-column: 1 / -1; grid-row: 2; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: center; column-gap: 12px; padding: 6px 8px 0 16px; }
+  .readouts .era { margin: -11px 0 -14px -8px; }
+  #civOut .temp { min-width: 0; }
+  .caption { grid-column: 1 / -1; grid-row: 3; max-width: none; }
+}
 .hist { padding-left: 16px; padding-right: 16px; }
 .hist-wrap { position: relative; }
 .hist-chart { display: block; width: 100%; height: 196px; touch-action: pan-y; cursor: crosshair; }
@@ -210,6 +228,7 @@ body.customizing.bottom-sheet .caption { display: none; }
 .context:empty { display: none; }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px 0 11px; border-radius: 22px; font-weight: 500; font-size: .9375rem; }
 .chip .ic { width: 20px; height: 20px; }
+.chip.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 
 .transport { display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 34px; box-shadow: 0 6px 24px var(--shadow); }
 .t-btn { width: 44px; height: 48px; border-radius: 24px; display: inline-flex; align-items: center; justify-content: center; }
@@ -267,10 +286,10 @@ body.bottom-sheet.customizing .transport, body.bottom-sheet.customizing .scale {
 .tab { height: 44px; padding: 0 13px; border-radius: 22px; font-weight: 500; font-size: .9375rem; color: var(--ink-2); }
 .tab[aria-selected="true"] { background: var(--fill-strong); color: var(--ink); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line-strong); }
 
+@media (max-width: 399px) { .sheet-body { padding-left: 10px; padding-right: 10px; } }
 @media (max-width: 379px) {
   .sheet-head { padding-left: 6px; padding-right: 4px; gap: 0; }
   .tab { padding: 0 9px; font-size: .875rem; }
-  #customSheet .x-btn { width: 40px; }
   .caption { font-size: .875rem; }
 }
 
@@ -288,27 +307,28 @@ body.bottom-sheet.customizing .transport, body.bottom-sheet.customizing .scale {
 .field-head .hint { font: italic 400 .8125rem/1.2 var(--font-sci); }
 .field-head .val { color: var(--ink); font-weight: 500; font-size: .9375rem; font-variant-numeric: tabular-nums; }
 .mass-row { display: flex; align-items: center; gap: 8px; }
-.sq-btn { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 14px; display: grid; place-items: center; flex: 0 0 auto; }
+.sq-btn { width: 48px; height: 48px; border: 1px solid var(--edge); border-radius: 14px; display: grid; place-items: center; flex: 0 0 auto; }
 .pair { display: grid; grid-template-columns: 1fr; gap: 8px; }
-@container sheet (min-width: 350px) { .pair { grid-template-columns: 1fr 1fr; } }
-.stepper { display: flex; align-items: stretch; height: 48px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+@container sheet (min-width: 336px) { .pair { grid-template-columns: 1fr 1fr; } }
+.stepper { display: flex; align-items: stretch; height: 48px; border: 1px solid var(--edge); border-radius: 14px; overflow: hidden; }
 .stepper button { width: 46px; display: grid; place-items: center; flex: 0 0 auto; }
 .stepper button:focus-visible { outline-offset: -3px; border-radius: 13px; }
 .stepper .val { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; font-weight: 500; font-size: .9375rem; font-variant-numeric: tabular-nums; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+@container sheet (max-width: 359px) { .stepper .val { font-size: .875rem; gap: 3px; } }
 #dirIcon { opacity: 1; transition: transform .1s; }
 
 input[type="range"] {
   -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 48px; margin: 0; background: transparent; cursor: pointer;
   --p: 50%;
 }
-input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--ink) var(--p), var(--fill-strong) var(--p)); }
-input[type="range"]::-moz-range-track { height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--ink) var(--p), var(--fill-strong) var(--p)); }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 32px; height: 32px; margin-top: -12px; border-radius: 50%; background: var(--primary-bg); border: 3px solid var(--field-0); box-shadow: 0 1px 6px var(--shadow); }
-input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--primary-bg); border: 3px solid var(--field-0); box-shadow: 0 1px 6px var(--shadow); }
+input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--ink) var(--p), var(--edge) var(--p)); }
+input[type="range"]::-moz-range-track { height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--ink) var(--p), var(--edge) var(--p)); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; box-sizing: border-box; width: 32px; height: 32px; margin-top: -12px; border-radius: 50%; background: var(--primary-bg); border: 3px solid var(--field-0); box-shadow: 0 1px 6px var(--shadow); }
+input[type="range"]::-moz-range-thumb { box-sizing: border-box; width: 32px; height: 32px; border-radius: 50%; background: var(--primary-bg); border: 3px solid var(--field-0); box-shadow: 0 1px 6px var(--shadow); }
 input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
 
 /* customize: view */
-.seg { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 15px; }
+.seg { display: flex; gap: 3px; padding: 3px; border: 1px solid var(--edge); border-radius: 15px; }
 .seg button { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 4px 6px; border-radius: 12px; font-weight: 500; font-size: .9375rem; line-height: 1.15; color: var(--ink-2); }
 .seg button[aria-checked="true"] { background: var(--primary-bg); color: var(--primary-fg); }
 .seg button:focus-visible { outline-offset: 1px; }
@@ -326,7 +346,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
 .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sky-intro { font: italic 400 .9375rem/1.45 var(--font-sci); color: var(--ink-2); margin: 4px 2px 12px; }
 .seed-row { display: flex; gap: 8px; margin: 0 0 14px; }
-.seed-row input { flex: 1 1 auto; min-width: 0; height: 44px; border: 1px solid var(--line); border-radius: 22px; padding: 0 16px; font: inherit; color: inherit; background: var(--fill); }
+.seed-row input { flex: 1 1 auto; min-width: 0; height: 44px; border: 1px solid var(--edge); border-radius: 22px; padding: 0 16px; font: inherit; color: inherit; background: var(--fill); }
 .seed-row input:focus-visible { outline-offset: 1px; }
 .seed-row .chip { border: 1px solid var(--line-strong); flex: 0 0 auto; }
 .preset .tg.params { font-style: normal; font-family: var(--font-ui); font-size: .75rem; font-variant-numeric: tabular-nums; }
@@ -361,7 +381,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
 .sci .live small { display: block; font-weight: 400; font-size: .8125rem; color: var(--ink-2); }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet, .sheet.open, .switch, .switch::after, .title-btn .ic, #captionText { transition: none; }
+  .sheet, .sheet.open, .switch, .switch::after, .switch .ic, .title-btn .ic, #captionText, .sci summary::after, #dirIcon { transition: none; }
 }
 
 </style>
@@ -404,9 +424,10 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
         <svg class="ic" aria-hidden="true"><use href="#i-chevron"/></svg>
       </button>
       <button id="captionBtn" class="caption" type="button" aria-haspopup="dialog" aria-controls="scienceSheet" aria-describedby="captionMore">
-        <span id="captionText" aria-live="polite"></span><svg class="ic i" aria-hidden="true"><use href="#i-info"/></svg>
+        <span id="captionText"></span><svg class="ic i" aria-hidden="true"><use href="#i-info"/></svg>
         <span id="captionMore" class="sr">More about the science</span>
       </button>
+      <p id="captionLive" class="sr" aria-live="polite"></p>
     </div>
     <div class="top-right">
       <button id="customBtn" class="icon-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="customSheet" aria-label="Customize" aria-keyshortcuts="C" title="Customize">
@@ -427,7 +448,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       <button id="resetBtn" class="chip" type="button" hidden><svg class="ic" aria-hidden="true"><use href="#i-reset"/></svg>Reset</button>
       <button id="planetBtn" class="chip" type="button" hidden title="Drop an Earth-mass world into this setup"><svg class="ic" aria-hidden="true"><use href="#i-planet"/></svg>Add a planet</button>
       <button id="skyBtn" class="chip" type="button" hidden aria-haspopup="dialog" aria-controls="skiesSheet" aria-keyshortcuts="S" title="Other skies, and your own seed"><svg class="ic" aria-hidden="true"><use href="#i-sky"/></svg>Skies</button>
-      <button id="fitBtn" class="chip" type="button" hidden aria-keyshortcuts="F" title="Recenter"><svg class="ic" aria-hidden="true"><use href="#i-fit"/></svg>Recenter</button>
+      <button id="fitBtn" class="chip" type="button" hidden aria-keyshortcuts="F" title="Frame every body again"><svg class="ic" aria-hidden="true"><use href="#i-fit"/></svg>Show all</button>
     </div>
     <div class="transport" id="transport" role="toolbar" aria-label="Playback">
       <button id="restartBtn" class="t-btn" type="button" aria-label="Restart" aria-keyshortcuts="R" title="Restart"><svg class="ic" aria-hidden="true"><use href="#i-restart"/></svg></button>
@@ -435,13 +456,14 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       <span class="sep" aria-hidden="true"></span>
       <div class="speed" role="group" aria-label="Playback speed">
         <button id="slowerBtn" class="t-btn" type="button" aria-label="Slower" aria-keyshortcuts="-" title="Slower"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg></button>
-        <output id="speedOut" aria-live="polite">1×</output>
+        <output id="speedOut">1×</output>
         <button id="fasterBtn" class="t-btn" type="button" aria-label="Faster" aria-keyshortcuts="+" title="Faster"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
       </div>
     </div>
   </div>
 </div>
 
+<p id="announce" class="sr" aria-live="polite"></p>
 <div class="scrim" id="scrim" hidden></div>
 
 <!-- Setups -->
@@ -456,7 +478,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
 <!-- Customize -->
 <section class="sheet" id="customSheet" role="dialog" aria-label="Customize" inert>
   <div class="sheet-head">
-    <div class="tabs" role="tablist" aria-label="Customize">
+    <div class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" type="button" role="tab" id="tab-bodies" aria-controls="pane-bodies" aria-selected="true">Bodies</button>
       <button class="tab" type="button" role="tab" id="tab-view" aria-controls="pane-view" aria-selected="false" tabindex="-1">View</button>
     </div>
@@ -494,9 +516,9 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
         <div class="field-head"><span>Velocity</span></div>
         <div class="pair">
           <div class="stepper" role="group" aria-label="Speed">
-            <button type="button" data-step="speed" data-dir="-1" aria-label="Slower"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg></button>
+            <button type="button" data-step="speed" data-dir="-1" aria-label="Less speed"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg></button>
             <span class="val"><span id="vVal"></span></span>
-            <button type="button" data-step="speed" data-dir="1" aria-label="Faster"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+            <button type="button" data-step="speed" data-dir="1" aria-label="More speed"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
           </div>
           <div class="stepper" role="group" aria-label="Direction">
             <button type="button" data-step="dir" data-dir="-1" aria-label="Turn clockwise"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg></button>
@@ -519,16 +541,16 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
         <div class="field">
           <div class="field-head"><span id="cameraLbl">Camera</span></div>
           <div class="seg" role="radiogroup" aria-labelledby="cameraLbl" id="cameraSeg">
-            <button type="button" role="radio" data-v="overview" aria-checked="true" tabindex="0">Overview</button>
+            <button type="button" role="radio" data-v="overview" aria-checked="true" tabindex="0">Show all</button>
             <button type="button" role="radio" data-v="follow" aria-checked="false" tabindex="-1">Follow selected</button>
           </div>
         </div>
         <div class="field">
           <div class="field-head"><span id="angleLbl">Angle</span></div>
-          <div class="seg" role="group" aria-labelledby="angleLbl" id="angleSeg">
-            <button type="button" data-v="0.06">Overhead</button>
-            <button type="button" data-v="0.95">Tilted</button>
-            <button type="button" data-v="1.38">Low</button>
+          <div class="seg" role="radiogroup" aria-labelledby="angleLbl" id="angleSeg">
+            <button type="button" role="radio" data-v="0.06" aria-checked="false" tabindex="-1">Overhead</button>
+            <button type="button" role="radio" data-v="0.95" aria-checked="true" tabindex="0">Tilted</button>
+            <button type="button" role="radio" data-v="1.38" aria-checked="false" tabindex="-1">Low</button>
           </div>
         </div>
         <button class="switch-row" type="button" role="switch" data-view="drift" aria-checked="true"><span>Slow turn while playing</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
@@ -543,9 +565,9 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       <div class="field">
         <div class="field-head"><span id="trailsLbl">Trails</span></div>
         <div class="seg" role="radiogroup" aria-labelledby="trailsLbl" id="trailSeg">
-          <button type="button" role="radio" data-v="off" aria-checked="false">Off</button>
-          <button type="button" role="radio" data-v="short" aria-checked="true">Short</button>
-          <button type="button" role="radio" data-v="long" aria-checked="false">Long</button>
+          <button type="button" role="radio" data-v="off" aria-checked="false" tabindex="-1">Off</button>
+          <button type="button" role="radio" data-v="short" aria-checked="true" tabindex="0">Short</button>
+          <button type="button" role="radio" data-v="long" aria-checked="false" tabindex="-1">Long</button>
         </div>
       </div>
       <button class="switch-row" type="button" role="switch" data-view="labels" aria-checked="false"><span>Body labels</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
@@ -559,7 +581,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
   </div>
 </section>
 
-<!-- Science -->
+<!-- Skies -->
 <section class="sheet left" id="skiesSheet" role="dialog" aria-modal="true" aria-labelledby="skiesTitle" inert>
   <div class="sheet-head">
     <h2 class="sheet-title" id="skiesTitle">Skies</h2>
@@ -708,7 +730,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     clone() {
       const c = Object.create(System.prototype);
       c.rtol = this.rtol; c.n = this.n; c.id = this.id.slice(); c.parts = this.parts.map(p => p.slice());
-      c.kind = this.kind.slice(); c.ripped = this.ripped.slice(); c.debris = this.debris.slice();
+      c.kind = this.kind.slice(); c.ripped = this.ripped.slice(); c.debris = this.debris.slice(); c.meta = this.meta.slice();
       c.m = Float64Array.from(this.m); c.y = Float64Array.from(this.y);
       c._alloc();
       c.k1.set(this.k1); c.yPrev.set(this.yPrev); c.fPrev.set(this.fPrev);
@@ -1294,7 +1316,7 @@ const COPY = {
     ] },
 };
 const THUMB_T = { eight: 6.33, moth: 14.9, triangle: 8.27, moon: 6.3, suns: 12.7, trisolaris: 75, sling: 9, swap: 13, pyth: 21,
-  home: 6.3, trappist: 0.35, proxima: 0.6, kepler442: 2.0, alphacen: 12, kepler47: 5.3, gj667: 1.0 };
+  home: 75, trappist: 0.35, proxima: 0.6, kepler442: 2.0, alphacen: 503, kepler47: 5.3, gj667: 1.0 };   // home: one turn of Jupiter; alphacen: one turn of the pair
 
 const SCI = {
   why: ['Why three is hard', [
@@ -1420,8 +1442,10 @@ let dirtyUntil = 0;
 const invalidate = (ms) => { dirtyUntil = Math.max(dirtyUntil, performance.now() + (ms || 700)); };
 
 /* ------------------------------------------------------------------ the 3D view: loaded on demand and drawn beneath the chart, which keeps every overlay */
-const sky3d = { api: null, loading: null, on: false, failed: false };
+const sky3d = { api: null, loading: null, on: false, failed: false, lost: null };
 const proj = (x, y) => { if (sky3d.on) { const p = sky3d.api.project(x, y); return [p.x, p.y]; } return [sx(x), sy(y)]; };
+/* Like proj, or null for a point behind the 3D camera: overlays that draw through a point skip it rather than streak. */
+const projFront = (x, y) => { if (sky3d.on) { const p = sky3d.api.project(x, y); return p.behind ? null : [p.x, p.y]; } return [sx(x), sy(y)]; };
 const unproj = (X, Y) => (sky3d.on ? sky3d.api.unproject(X, Y) : [wx(X), wy(Y)]);
 const scaleNow = () => (sky3d.on ? sky3d.api.pxPerWorld : cam.scale);
 function setViewMode(mode, opts) {
@@ -1432,34 +1456,52 @@ function setViewMode(mode, opts) {
   if (sky3d.api) { enterThree(); refreshViewPane(); return; }
   refreshViewPane();
   if (sky3d.loading) return;
+  const slow = setTimeout(() => { if (sky3d.loading && !sky3d.api) say('load3d', 'Loading the 3D view…', true, { now: true, hint: true }); }, 250);
   sky3d.loading = import(new URL('src/sky3d.js', location.href).href).then(m => {
-    sky3d.api = m.createSky3D({ canvas: dom.sky3d });
+    sky3d.api = m.createSky3D({ canvas: dom.sky3d, onContextLost: contextLost, onContextRestored: contextRestored,
+      onTextureError: () => say('tex3d', 'Some surface pictures did not load, so the spheres show their colours only.', false) });
     sky3d.api.setTheme(theme); sky3d.api.rig.drift = !!ui.view.drift;
-    if (ui.view.mode === '3d') { enterThree(); refreshViewPane(); }
+    if (ui.view.mode === '3d') enterThree();
+    refreshViewPane();
   }).catch(err => {
     console.error(err);
     sky3d.failed = true; sky3d.loading = null; ui.view.mode = 'flat'; store.set('view', ui.view); refreshViewPane();
-    say('no3d', 'The 3D view could not start in this browser, so the flat chart stays.', true, { now: true });
-  });
+    say('no3d', NO_3D, true, { now: true });
+  }).finally(() => clearTimeout(slow));
+}
+const NO_3D = 'The 3D view could not start in this browser, so the flat chart stays.';
+/* The graphics context can be taken away (a GPU reset, too many tabs). Show the flat chart until it comes back. */
+function contextLost() {
+  if (!sky3d.on) { sky3d.lost = 'flat'; return; }
+  sky3d.lost = '3d'; leaveThree(); refreshViewPane();
+  say('lost3d', 'The 3D view lost its graphics. The flat chart is showing until they come back.', true, { now: true });
+}
+function contextRestored() {
+  const was = sky3d.lost; sky3d.lost = null;
+  if (was === '3d' && ui.view.mode === '3d') { enterThree(); refreshViewPane(); }
 }
 function enterThree() {
-  if (sky3d.on) return;
+  if (sky3d.on || sky3d.lost) return;
   sky3d.on = true; dom.sky3d.hidden = false; dom.sky.classList.add('three');
   sky3d.api.resize(view.w, view.h, view.dpr); sky3d.api.setQuality(perf.quality);
   sky3d.api.rig.setMode(cam.auto ? 'overview' : 'manual'); sky3d.api.rig.cutNext();
-  say('three', 'Drag to turn the view, scroll or pinch to zoom, and double-tap a body to follow it. The orbits stay in one plane; only the camera moves.', true, { now: true });
+  say('three', (coarse() ? 'Drag to turn the view, pinch to zoom, and double-tap a body to follow it.' : 'Drag to turn the view, scroll to zoom, and double-click a body to follow it.')
+    + ' The orbits stay in one plane; only the camera moves.', true, { now: true, hint: true });
   syncFitBtn(); markLayout(); invalidate();
 }
 function leaveThree() {
   if (!sky3d.on) return;
+  /* The spheres and their compiled shaders are kept for a quick return; the next 3D frame drops anything stale. */
   sky3d.on = false; dom.sky3d.hidden = true; dom.sky.classList.remove('three');
-  sky3d.api.clear(); cam.cut = true; cam.inited = false; syncFitBtn(); markLayout(); invalidate();
+  cam.cut = true; cam.inited = false; syncFitBtn(); markLayout(); invalidate();
+  dropHint();                               // a 3D how-to line means nothing on the flat chart
 }
 function syncFitBtn() { dom.fitBtn.hidden = sky3d.on ? sky3d.api.rig.mode === 'overview' : cam.auto; }
 function followBody(id) {
   if (!sky3d.on) return;
   sky3d.api.rig.setMode('follow', id); world.sel = id; bodiesDirty = true;
-  const b = bodyById(world.cur, id); if (b) say('follow', 'Following ' + nameOf(b) + '. Press F, or double-tap empty sky, to see everything again.', true, { now: true });
+  const b = bodyById(world.cur, id);
+  if (b) say('follow', 'Following ' + nameOf(b) + '. Press F, or ' + (coarse() ? 'double-tap' : 'double-click') + ' empty sky, to see everything again.', true, { now: true, hint: true });
   refreshViewPane(); syncFitBtn(); invalidate();
 }
 
@@ -1656,11 +1698,10 @@ function refreshCivOut() {
   if (!c || c.T === null) { if (!el.hidden) el.hidden = true; if (!era.hidden) era.hidden = true; return; }
   if (c.over) { if (!el.hidden) el.hidden = true; }           // the planet is gone; its history stays a tap away
   else {
-    const deg = Math.round(c.T - 273.15); let num = (deg < 0 ? MINUS : '') + Math.abs(deg);
-    while (num.length < 4) num = '\u2007' + num;               // figure spaces: the line keeps its width as the sign comes and goes
-    const text = (c.alive ? 'Civilization ' + c.n + ' · ' : '') + num + ' °C';
+    const deg = Math.round(c.T - 273.15), civ = c.alive ? 'Civilization ' + c.n + ' · ' : '', temp = (deg < 0 ? MINUS : '') + Math.abs(deg) + ' °C';
     if (el.hidden) el.hidden = false;
-    if (el.textContent !== text) el.textContent = text;
+    /* the temperature sits in a fixed-width box, so a right-aligned line keeps its width as the sign comes and goes */
+    if (el.dataset.text !== civ + temp) { el.dataset.text = civ + temp; el.textContent = civ; const t = document.createElement('span'); t.className = 'temp'; t.textContent = temp; el.appendChild(t); }
   }
   if (era.hidden) era.hidden = false;
   const lbl = c.over ? 'History' : c.exiled ? 'In exile' : c.era === 'stable' ? 'Stable Era' : 'Chaotic Era';
@@ -1682,15 +1723,22 @@ const bodyById = (list, id) => list.find(b => b.id === id);
 const bodyWithPart = (list, p) => list.find(b => b.parts.indexOf(p) >= 0);
 
 /* ------------------------------------------------------------------ insight line */
-const insight = { queue: [], shownAt: -1e9, timer: 0, said: new Set(), text: '' };
-function showCaption(text) {
-  insight.text = text; insight.shownAt = performance.now();
+/* A hint is a how-to line shown in answer to a control (the 3D view, following a body). It stands in for the story line
+ * for a while, then the story line comes back; `base` is that story line. */
+const insight = { queue: [], shownAt: -1e9, timer: 0, said: new Set(), text: '', base: '', hint: false, hintTimer: 0 };
+const coarse = () => !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);   // touch first: say tap, pinch
+function showCaption(text, hint) {
+  insight.text = text; insight.shownAt = performance.now(); insight.hint = !!hint;
+  clearTimeout(insight.hintTimer);
+  if (hint === true) insight.hintTimer = setTimeout(dropHint, 9000); else if (!hint) insight.base = text;   // 'hold': until the mode it explains ends
   const el = dom.captionText;
   if (el.textContent === text) return;
   el.classList.add('swap');
   setTimeout(() => { el.textContent = text; el.classList.remove('swap'); markLayout(); }, reducedMotion ? 0 : 180);
+  dom.captionLive.textContent = text;
   dom.sky.setAttribute('aria-label', world.preset.name + '. ' + text);
 }
+function dropHint() { if (insight.hint && insight.base) showCaption(insight.base); }
 function setCaption(text) {             // immediate: replaces whatever is showing or waiting
   clearTimeout(insight.timer); insight.queue = []; showCaption(text);
 }
@@ -1699,7 +1747,7 @@ function say(key, text, repeatable, opts) {   // queued: gives the previous line
   opts = opts || {};
   if (opts.replaces) insight.queue = insight.queue.filter(q => q.group !== opts.replaces);
   if (opts.now) {                          // a direct answer to something the person just did: no waiting
-    clearTimeout(insight.timer); showCaption(text);
+    clearTimeout(insight.timer); showCaption(text, opts.hint);
     if (insight.queue.length) insight.timer = setTimeout(pumpInsights, 3020);
     return;
   }
@@ -1843,7 +1891,7 @@ function onMainEvents() {
     if (ev.type === 'rip') {
       const p = bodyById(world.cur, ev.id), by = bodyById(world.cur, ev.by);
       const d = ev.d ? fmtDist(ev.d) : null;
-      let text = (by ? capName(by) + '’s' : 'The star’s') + ' tides have torn ' + (p ? nameOf(p) : 'a world') + ' apart' + (d ? ', ' + d + ' from its centre' : '') + '. A tenth of it trails behind as debris.';
+      let text = (by ? capName(by) + '’s' : 'The star’s') + ' tides have torn ' + (p ? nameOf(p) : 'a world') + ' apart' + (d ? ', ' + d + ' from its center' : '') + '. A tenth of it trails behind as debris.';
       if (c && ev.id === c.id) { text = killCiv(text); chronicle('rip', text); }
       say('rip' + world.evSeen, text, false, { urgent: true });
       slowFor(3000, 0.1);
@@ -1919,7 +1967,7 @@ function snapshot() {
     pi: world.pi, sky: world.sky, edited: world.edited, ic: cloneBodies(world.ic), sys: world.sys.clone(),
     t: world.t, trails: snapTrails(world.trails), escaped: new Set(world.escaped), evSeen: world.evSeen,
     R0: world.R0, S0: world.S0, vRef: world.vRef, arrowK: world.arrowK, com0: world.com0.slice(), sel: world.sel, dirMemo: Object.assign({}, world.dirMemo),
-    flags: Object.assign({}, world.flags), flyMin: world.flyMin, said: new Set(insight.said), caption: insight.text, portrait: world.portrait,
+    flags: Object.assign({}, world.flags), flyMin: world.flyMin, said: new Set(insight.said), caption: insight.hint ? insight.base : insight.text, portrait: world.portrait,
     frameBox: world.frameBox, civ: cloneCiv(world.civ),
   };
 }
@@ -1989,14 +2037,15 @@ function togglePlacing() {
   if (place.on) { exitPlacing(); addPlanet(); return; }         // asked twice: take the suggested spot
   place.on = true; place.was = world.playing; place.hover = false;
   if (world.playing) setPlaying(false);
-  dom.sky.classList.add('placing'); dom.planetBtn.setAttribute('aria-pressed', 'true'); dom.planetBtn.lastChild.textContent = 'Suggest a spot';
-  say('placing', 'Tap the sky where the planet should go. It will start on a circular orbit around the nearest sun. Press the button again for a suggested spot.', true, { now: true });
+  dom.sky.classList.add('placing'); dom.planetBtn.classList.add('on'); dom.planetBtn.lastChild.textContent = 'Suggest a spot';
+  say('placing', (coarse() ? 'Tap' : 'Click') + ' the sky where the planet should go. It will start on a circular orbit around the nearest sun. Press the button again for a suggested spot.', true, { now: true, hint: 'hold' });
   invalidate();
 }
 function exitPlacing(resume) {
   if (!place.on) return;
   place.on = false; place.hover = false;
-  dom.sky.classList.remove('placing'); dom.planetBtn.setAttribute('aria-pressed', 'false'); dom.planetBtn.lastChild.textContent = 'Add a planet';
+  dom.sky.classList.remove('placing'); dom.planetBtn.classList.remove('on'); dom.planetBtn.lastChild.textContent = 'Add a planet';
+  dropHint();
   if (resume && place.was && !world.playing) setPlaying(true);
   invalidate();
 }
@@ -2015,9 +2064,18 @@ function placeAt(x, y) {
 }
 function drawPlacing() {
   if (!place.on || !place.hover) return;
-  const spot = spotFor(place.x, place.y, world.cur), [X, Y] = proj(spot.at[0], spot.at[1]);
-  ctx.setLineDash([2, 6]); ctx.lineWidth = 1.3; ctx.strokeStyle = inkA(0.6); ctx.beginPath(); ctx.arc(X, Y, spot.r * scaleNow(), 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
-  const [px, py] = proj(place.x, place.y), r = 7;
+  const spot = spotFor(place.x, place.y, world.cur);
+  ctx.setLineDash([2, 6]); ctx.lineWidth = 1.3; ctx.strokeStyle = inkA(0.6); ctx.beginPath();
+  if (sky3d.on) {                           // the orbit lies on the plane, so in 3D it is drawn as the tilted ellipse it will be
+    let pen = false;
+    for (let k = 0; k <= 72; k++) {
+      const a = k * Math.PI / 36, q = projFront(spot.at[0] + spot.r * Math.cos(a), spot.at[1] + spot.r * Math.sin(a));
+      if (!q) { pen = false; continue; } if (pen) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); pen = true;
+    }
+  } else { const [X, Y] = proj(spot.at[0], spot.at[1]); ctx.arc(X, Y, spot.r * scaleNow(), 0, 2 * Math.PI); }
+  ctx.stroke(); ctx.setLineDash([]);
+  const pp = projFront(place.x, place.y); if (!pp) return;
+  const [px, py] = pp, r = 7;
   ctx.fillStyle = rgba(theme.worldMild, 0.75); ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI); ctx.fill();
   ctx.strokeStyle = inkA(0.8); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py, r + 0.5, 0, 2 * Math.PI); ctx.stroke();
 }
@@ -2098,11 +2156,11 @@ function computeForecast(quick) {
 /* ------------------------------------------------------------------ dom + theme */
 const $ = id => document.getElementById(id);
 const dom = {};
-['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
+['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'captionLive', 'announce', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
   'context', 'undoBtn', 'resetBtn', 'skyBtn', 'skyPill', 'skiesSheet', 'skyGrid', 'seedForm', 'seedInput', 'planetBtn', 'eraOut', 'eraLbl', 'eraStrip', 'historySheet', 'histBody', 'histCanvas', 'histTip', 'histLegend', 'histStats', 'histLog', 'fitBtn', 'transport', 'restartBtn', 'playBtn', 'playIcon', 'slowerBtn', 'fasterBtn', 'speedOut', 'scrim',
   'presetSheet', 'presetGrid', 'customSheet', 'scienceSheet', 'sciBody', 'sheetPlay', 'sheetPlayIcon', 'sheetRestart', 'bodyChips', 'massRange', 'massVal',
   'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields', 'gridRow'].forEach(id => { dom[id] = $(id); });
-dom.topLeft = document.querySelector('.top-left'); dom.topRight = document.querySelector('.top-right');
+dom.readouts = document.querySelector('.readouts');
 const ctx = dom.sky.getContext('2d');
 const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
 let reducedMotion = motionMQ.matches;
@@ -2203,6 +2261,10 @@ function resize() {
   if (sky3d.api) sky3d.api.resize(view.w, view.h, view.dpr);
   document.body.classList.toggle('bottom-sheet', !drawerMQ.matches);
   applyInsets(); markLayout();
+  /* canvases inside an open sheet are drawn at their size: draw them again at the new one */
+  if (ui.sheet === 'history') renderHistory();
+  else if (ui.sheet === 'preset') { thumbStamp = -1; renderPresets(); }
+  else if (ui.sheet === 'skies') for (const b of dom.skyGrid.children) drawThumb(b.firstChild, skyPreset(SKY_LIST.find(k => k.key === b.dataset.key) || world.sky));
 }
 function applyInsets() {
   let ib = 0, ir = 0;
@@ -2213,12 +2275,14 @@ function applyInsets() {
   const st = document.documentElement.style;
   st.setProperty('--inset-bottom', Math.max(0, ib) + 'px'); st.setProperty('--inset-right', Math.max(0, ir) + 'px');
 }
+const boxOf = el => { if (!el) return null; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
 function measure() {
   layoutDirty = false;
   const W = view.w, H = view.h, roomy = W >= 700 || W > H;
-  const tl = (roomy ? dom.presetBtn : dom.topLeft).getBoundingClientRect();
-  const tr = (roomy ? dom.customBtn : dom.topRight).getBoundingClientRect();
-  const top = Math.max(tl.bottom, tr.bottom) + 6;
+  /* With room to spare the sky runs up under the caption and readouts; on a narrow screen it starts below them. */
+  let top = 0;
+  for (const el of roomy ? [dom.presetBtn, dom.customBtn] : [dom.presetBtn, dom.customBtn, dom.captionBtn, dom.readouts]) { const r = boxOf(el); if (r) top = Math.max(top, r.bottom); }
+  top += 6;
   let bottom = dom.bottom.getBoundingClientRect().top - 4, right = W;
   if (ui.sheet === 'custom') {
     const s = dom.customSheet, br = document.body.getBoundingClientRect();
@@ -2388,15 +2452,16 @@ function drawForecast() {
     const K = Math.min(6, Math.max(1, n >> 3));
     for (let c = 0; c < K; c++) {
       const i0 = Math.floor(c * (n - 1) / K), i1 = Math.floor((c + 1) * (n - 1) / K);
-      const [mx, my] = proj(p[2 * i0], p[2 * i0 + 1]);
-      ctx.strokeStyle = rgba(colorById(id, fc.bodies), (0.85 * (1 - c / K) + 0.12).toFixed(3)); ctx.beginPath(); ctx.moveTo(mx, my);
-      for (let j = i0 + 1; j <= i1; j++) { const [lx, ly] = proj(p[2 * j], p[2 * j + 1]); ctx.lineTo(lx, ly); }
+      ctx.strokeStyle = rgba(colorById(id, fc.bodies), (0.85 * (1 - c / K) + 0.12).toFixed(3)); ctx.beginPath();
+      let pen = false;                       // in 3D the path breaks where it passes behind the camera
+      for (let j = i0; j <= i1; j++) { const q = projFront(p[2 * j], p[2 * j + 1]); if (!q) { pen = false; continue; } if (pen) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]); pen = true; }
       ctx.stroke();
     }
   });
   ctx.setLineDash([]);
-  if (fc.merge) {
-    const [X, Y] = proj(fc.merge.x, fc.merge.y);
+  const mp = fc.merge && projFront(fc.merge.x, fc.merge.y);
+  if (mp) {
+    const [X, Y] = mp;
     ctx.strokeStyle = inkA(0.9); ctx.lineWidth = 1.6; ctx.beginPath();
     for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; ctx.moveTo(X + 5 * Math.cos(a), Y + 5 * Math.sin(a)); ctx.lineTo(X + 10 * Math.cos(a), Y + 10 * Math.sin(a)); }
     ctx.stroke();
@@ -2404,9 +2469,11 @@ function drawForecast() {
 }
 
 function drawCOM() {
-  const c = centerOfMass(world.cur), [X, Y] = proj(c[0], c[1]), [X0, Y0] = proj(world.com0[0], world.com0[1]);
+  const c = centerOfMass(world.cur), here = projFront(c[0], c[1]), start = projFront(world.com0[0], world.com0[1]);
+  if (!here) return;
+  const [X, Y] = here;
   ctx.strokeStyle = inkA(0.85); ctx.lineWidth = 1.4;
-  if (Math.hypot(X - X0, Y - Y0) > 3) { ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(X0, Y0); ctx.lineTo(X, Y); ctx.stroke(); ctx.setLineDash([]); }
+  if (start && Math.hypot(X - start[0], Y - start[1]) > 3) { ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(start[0], start[1]); ctx.lineTo(X, Y); ctx.stroke(); ctx.setLineDash([]); }
   ctx.beginPath(); ctx.arc(X, Y, 6, 0, 2 * Math.PI); ctx.moveTo(X - 10, Y); ctx.lineTo(X + 10, Y); ctx.moveTo(X, Y - 10); ctx.lineTo(X, Y + 10); ctx.stroke();
 }
 
@@ -2417,25 +2484,34 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
   const gainWant = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.S0 / view.h, 0.6), 1, 10) : 1;
   gain3d += (gainWant - gain3d) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3));
   const gain = gain3d;
+  const P = layoutBodies.pts || (layoutBodies.pts = []);
+  for (let i = 0; i < n; i++) {             // every screen position once, rather than once per pair
+    let q = P[i]; if (!q) q = P[i] = { x: 0, y: 0, s: 0, behind: false };
+    if (sky3d.on) { const p = sky3d.api.project(b[i].x, b[i].y); q.x = p.x; q.y = p.y; q.s = p.s; q.behind = p.behind; }
+    else { q.x = sx(b[i].x); q.y = sy(b[i].y); q.s = 0; q.behind = false; }
+  }
   for (let i = 0; i < n; i++) {
-    let X, Y, S = 0;
-    if (sky3d.on) { const p = sky3d.api.project(b[i].x, b[i].y); X = p.x; Y = p.y; S = p.s; } else { X = sx(b[i].x); Y = sy(b[i].y); }
-    const R = bodyR(b[i]) * gain;
-    let f = 1, nx = 0, ny = 0, best = Infinity, nearW = Infinity;
+    const X = P[i].x, Y = P[i].y, S = P[i].s, Ri = bodyR(b[i]), R = Ri * gain;
+    let f = 1, nx = 0, ny = 0, best = Infinity, nearW = Infinity, nearR = 0;
     for (let j = 0; j < n; j++) if (j !== i) {
-      const [jx, jy] = proj(b[j].x, b[j].y), dx = jx - X, dy = jy - Y, d = Math.hypot(dx, dy);
+      const dx = P[j].x - X, dy = P[j].y - Y, d = Math.hypot(dx, dy);
       if (d < best) { best = d; nx = dx; ny = dy; f = clamp(0.46 * d / (R + bodyR(b[j])), 0.3, 1); }
-      nearW = Math.min(nearW, Math.hypot(b[j].x - b[i].x, b[j].y - b[i].y));
+      const w = Math.hypot(b[j].x - b[i].x, b[j].y - b[i].y); if (w < nearW) { nearW = w; nearR = bodyR(b[j]); }
     }
     /* Flat discs shrink when a neighbour is close on screen. A sphere has depth, and in a tilted view that rule would
-     * pulse whenever bodies merely pass one another, so in 3D only the close-up growth is limited: a body keeps its
-     * flat size, and grows past it no further than an eighth of the real distance to its nearest neighbour, so close
-     * pairs and moons stay apart and nothing outgrows the orbit it traces. */
-    if (sky3d.on) f = n > 1 ? clamp(Math.max(bodyR(b[i]), 0.12 * nearW * (S || scaleNow())) / R, 0, 1) : 1;
+     * pulse whenever bodies merely pass one another in projection, so in 3D the same rule runs on the real distance to
+     * the nearest neighbour at this depth: a crowded system seen from far off draws small spheres instead of a clump.
+     * Close up, a body grows past its flat size no further than an eighth of that distance, so close pairs and moons
+     * stay apart and nothing outgrows the orbit it traces. */
+    if (sky3d.on) {
+      if (n > 1) { const sep = nearW * (S || scaleNow()), floor = Ri * clamp(0.46 * sep / (Ri + nearR), 0.3, 1); f = clamp(Math.max(floor, 0.12 * sep) / R, 0, 1); }
+      else f = 1;
+    }
     const id = b[i].id;
     if (shrink[id] === undefined) shrink[id] = 1;
     shrink[id] += (f - shrink[id]) * k;
-    drawn.set(id, { x: X, y: Y, r: Math.max(1.7, R * shrink[id]), R, nx, ny, nd: best, s: S });
+    const r = Math.max(1.7, R * shrink[id]);   // vr: the radius as seen, since a sphere is drawn a little larger than a disc
+    drawn.set(id, { x: X, y: Y, r, vr: sky3d.on ? r * sky3d.api.sizeGain(b[i]) : r, R, nx, ny, nd: best, s: S, behind: P[i].behind });
   }
 }
 /* A tidally locked world keeps one face to the sun that holds it: its surface phase follows the direction to that sun
@@ -2486,7 +2562,7 @@ function drawBodyMarks(q, d, col, lab, paused) {   // letters and the paused sel
     } else {
       let ux = -d.nx, uy = -d.ny; const L = Math.hypot(ux, uy);
       if (L > 0 && d.nd < 60) { ux /= L; uy /= L; } else { ux = 0.7071; uy = -0.7071; }
-      const off = d.r + 10; ctx.font = '600 12px ' + theme.fontUI;
+      const off = d.vr + 10; ctx.font = '600 12px ' + theme.fontUI;
       ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.lineJoin = 'round';
       ctx.strokeText(lab, d.x + ux * off, d.y + uy * off); ctx.fillStyle = rgba(col, 1); ctx.fillText(lab, d.x + ux * off, d.y + uy * off);
     }
@@ -2495,26 +2571,27 @@ function drawBodyMarks(q, d, col, lab, paused) {   // letters and the paused sel
     const sel = q.id === world.sel;
     ctx.strokeStyle = inkA(sel ? 0.95 : 0.5); ctx.lineWidth = sel ? 1.8 : 1.2;
     if (!sel) ctx.setLineDash([3, 4]);
-    ctx.beginPath(); ctx.arc(d.x, d.y, Math.max(d.r, 5) + 6.5, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(d.x, d.y, Math.max(d.vr, 5) + 6.5, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
   }
 }
 function drawBodyOverlays(paused) {       // in 3D the spheres are drawn beneath; only their marks go on the chart
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  for (const q of world.cur) { const d = drawn.get(q.id); if (!d || d.x < -1e5) continue; drawBodyMarks(q, d, colorOf(q), labelOf(q), paused); }
+  for (const q of world.cur) { const d = drawn.get(q.id); if (!d || d.behind) continue; drawBodyMarks(q, d, colorOf(q), labelOf(q), paused); }
 }
 
 const HANDLE_MIN = 36;
 function handleOf(q) {                     // where a body's velocity handle sits on screen
-  const d = drawn.get(q.id); if (!d) return null;
+  const d = drawn.get(q.id); if (!d || d.behind) return null;
   let vx, vy;
   if (sky3d.on) {                           // the arrow lies on the plane: project its tip, so it foreshortens with the view
     const k = world.arrowK / (d.s || scaleNow()), p = sky3d.api.project(q.x + q.vx * k, q.y + q.vy * k);
+    if (p.behind) return null;
     vx = p.x - d.x; vy = p.y - d.y;
   } else { vx = q.vx * world.arrowK; vy = -q.vy * world.arrowK; }
   const len = Math.hypot(vx, vy);
-  if (len < 0.75) return { x: d.x + 25.5, y: d.y - 25.5, len: 0, ux: 0.7071, uy: -0.7071, bx: d.x, by: d.y, r: d.r };
+  if (len < 0.75) return { x: d.x + 25.5, y: d.y - 25.5, len: 0, ux: 0.7071, uy: -0.7071, bx: d.x, by: d.y, r: d.vr };
   const ux = vx / len, uy = vy / len, L = Math.max(len, HANDLE_MIN);
-  return { x: d.x + ux * L, y: d.y + uy * L, len, ux, uy, bx: d.x, by: d.y, r: d.r };
+  return { x: d.x + ux * L, y: d.y + uy * L, len, ux, uy, bx: d.x, by: d.y, r: d.vr };
 }
 function drawArrows(paused) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -2548,16 +2625,31 @@ function arrowPath(h, start, tx, ty, paused) {
 
 function drawEvents() {
   if (!eventEffects) return;
-  eventEffects.draw(ctx, { bodies: world.cur, project: b => { const [x, y] = proj(b.x, b.y); return { x, y }; },
-    radius: b => drawn.get(b.id)?.r || bodyR(b), quality: perf.quality, theme: theme.additive ? 'dark' : 'light' });
+  eventEffects.draw(ctx, { bodies: world.cur, project: b => { const p = projFront(b.x, b.y); return p ? { x: p[0], y: p[1] } : null; },
+    radius: b => drawn.get(b.id)?.vr || bodyR(b), quality: perf.quality, theme: theme.additive ? 'dark' : 'light' });
+}
+/* Marks keep off the text on the chart: the caption, the readouts, the scale and the chips. Measured only on a frame
+ * that has a mark to place. */
+function clearOfText(X, Y, s, m) {
+  const boxes = [dom.captionBtn, dom.readouts, dom.scale, dom.context].map(boxOf).filter(Boolean);
+  for (let pass = 0; pass < 3; pass++) {
+    const b = boxes.find(r => X > r.left - 8 && X < r.right + 8 && Y > r.top - 8 && Y < r.bottom + 8);
+    if (!b) break;
+    const ways = [[X, b.bottom + m], [X, b.top - m], [b.left - m, Y], [b.right + m, Y]]
+      .filter(([x, y]) => x >= s.l + m && x <= s.r - m && y >= s.t + m && y <= s.b - m);
+    if (!ways.length) break;
+    ways.sort((p, q) => Math.hypot(p[0] - X, p[1] - Y) - Math.hypot(q[0] - X, q[1] - Y));
+    [X, Y] = ways[0];
+  }
+  return [X, Y];
 }
 function drawEdgeMarks() {                 // a body out of view leaves a marker at the edge it left by
   const s = view.safe, m = 16;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const q of world.cur) {
     const d = drawn.get(q.id);
-    if (d.x > -d.r && d.x < view.w + d.r && d.y > -d.r && d.y < view.h + d.r) continue;
-    const X = clamp(d.x, s.l + m, s.r - m), Y = clamp(d.y, s.t + m, s.b - m), a = Math.atan2(d.y - Y, d.x - X);
+    if (!d.behind && d.x > -d.vr && d.x < view.w + d.vr && d.y > -d.vr && d.y < view.h + d.vr) continue;
+    const [X, Y] = clearOfText(clamp(d.x, s.l + m, s.r - m), clamp(d.y, s.t + m, s.b - m), s, m), a = Math.atan2(d.y - Y, d.x - X);
     ctx.fillStyle = rgba(colorOf(q), 1); ctx.beginPath();
     ctx.moveTo(X + 9 * Math.cos(a), Y + 9 * Math.sin(a)); ctx.lineTo(X + 6 * Math.cos(a + 2.3), Y + 6 * Math.sin(a + 2.3)); ctx.lineTo(X + 6 * Math.cos(a - 2.3), Y + 6 * Math.sin(a - 2.3)); ctx.closePath(); ctx.fill();
     if (ui.view.labels) {
@@ -2572,7 +2664,7 @@ function drawDragLabel() {
   const q = bodyById(world.cur, drag.id); if (!q) return;
   const d = drawn.get(q.id); let text, X, Y;
   if (drag.mode === 'vel') { const h = handleOf(q); text = sig(Math.hypot(q.vx, q.vy) * V_KMS, 3) + ' km/s'; X = h.x; Y = h.y - 30; }
-  else { text = signed(q.x, 2) + ', ' + signed(q.y, 2) + ' AU'; X = d.x; Y = d.y - d.r - 34; }
+  else { text = signed(q.x, 2) + ', ' + signed(q.y, 2) + ' AU'; X = d.x; Y = d.y - d.vr - 34; }
   ctx.font = '500 14px ' + theme.fontUI; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const w = ctx.measureText(text).width;
   X = clamp(X, w / 2 + 10, view.w - w / 2 - 10); if (Y < view.safe.t + 12) Y += 68;
@@ -2617,6 +2709,7 @@ function updateScaleBar() {
     if (target < 0.0075) { const km = nice125(target * AU_KM); len = km / AU_KM; label = group(km) + ' km'; }
     else { len = nice125(target); label = (len < 1 ? '1/' + Math.round(1 / len) + ' of ' : len > 1 ? len + '× ' : '') + 'Earth–Sun distance'; }
   }
+  if (sky3d.on && sky3d.api.rig.cur.phi > 0.35) label += ' at center';   // a tilted view is foreshortened: the bar holds only where the camera looks
   const px = Math.round(len * s);
   if (px !== scaleCache.px) { dom.scaleBar.style.width = px + 'px'; scaleCache.px = px; }
   if (label !== scaleCache.label) { dom.scaleLbl.textContent = label; scaleCache.label = label; }
@@ -2626,23 +2719,31 @@ function updateScaleBar() {
 const thumbData = {};
 function thumbPaths(p) {
   if (thumbData[p.id]) return thumbData[p.id];
-  const b = bodiesFor(p, false), S = new System(b, 1e-9), T = THUMB_T[p.id] || p.thumbT || p.trail, R0 = maxSeparation(b), n = b.length;
-  const paths = b.map(q => [q.x, q.y]), min2 = Math.pow(R0 / 140, 2), tmp = new Float64Array(4 * n);
+  const b = bodiesFor(p, false), S = new System(b, 1e-9), T = THUMB_T[p.id] || p.thumbT || p.trail, n = b.length;
+  /* A hierarchical system's thumbnail shows its near sun and worlds, measured from their own centre of mass as the page
+   * follows them: the near group may sit hundreds of AU from the origin and drift across its own orbits meanwhile. */
+  const keep = p.frame ? b.map(q => p.frame.includes(q.id)) : null, start = keep ? b.filter((_, i) => keep[i]) : b;
+  const ref = (xy, stride) => {
+    if (!keep) return [0, 0];
+    let M = 0, x = 0, y = 0;
+    for (let i = 0; i < n; i++) if (keep[i]) { M += b[i].m; x += b[i].m * xy[stride * i]; y += b[i].m * xy[stride * i + 1]; }
+    return [x / M, y / M];
+  };
+  const r0 = ref(b.flatMap(q => [q.x, q.y]), 2), R0 = maxSeparation(start) || maxSeparation(b);
+  const paths = b.map(q => [q.x - r0[0], q.y - r0[1]]), min2 = Math.pow(R0 / 140, 2), tmp = new Float64Array(4 * n);
   while (S.t < T && S.steps < 60000 && S.n === n) {
     S.step(); if (S.n !== n) break;
     const h = S.t - S.tPrev; let d2 = 0;
-    for (let i = 0; i < n; i++) d2 = Math.max(d2, (S.y[2 * i] - S.yPrev[2 * i]) ** 2 + (S.y[2 * i + 1] - S.yPrev[2 * i + 1]) ** 2);
+    for (let i = 0; i < n; i++) if (!keep || keep[i]) d2 = Math.max(d2, (S.y[2 * i] - S.yPrev[2 * i]) ** 2 + (S.y[2 * i + 1] - S.yPrev[2 * i + 1]) ** 2);
     const nsub = clamp(Math.ceil(Math.sqrt(d2 / min2)), 1, 16);
     for (let s = 1; s <= nsub; s++) {
       S.sample(S.tPrev + h * s / nsub, tmp);
-      for (let i = 0; i < n; i++) { const q = paths[i], L = q.length, dx = tmp[4 * i] - q[L - 2], dy = tmp[4 * i + 1] - q[L - 1]; if (dx * dx + dy * dy >= min2) q.push(tmp[4 * i], tmp[4 * i + 1]); }
+      const [rx, ry] = ref(tmp, 4);
+      for (let i = 0; i < n; i++) { const q = paths[i], L = q.length, x = tmp[4 * i] - rx, y = tmp[4 * i + 1] - ry, dx = x - q[L - 2], dy = y - q[L - 1]; if (dx * dx + dy * dy >= min2) q.push(x, y); }
     }
   }
-  if (p.frame) {                           // a hierarchical system's thumbnail shows the near sun and its worlds
-    const keep = b.map(q => p.frame.includes(q.id)), start = b.filter((_, i) => keep[i]);
-    return (thumbData[p.id] = { paths: paths.filter((_, i) => keep[i]), R0: maxSeparation(start) || R0, start });
-  }
-  return (thumbData[p.id] = { paths, R0, start: b });
+  const at = start.map(q => ({ ...q, x: q.x - r0[0], y: q.y - r0[1] }));
+  return (thumbData[p.id] = { paths: keep ? paths.filter((_, i) => keep[i]) : paths, R0, start: at });
 }
 function drawThumb(cv, p) {
   const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.max(40, r.width), h = Math.max(30, r.height);
@@ -2675,7 +2776,6 @@ function refreshChrome() {
   dom.skyPill.hidden = !showSky; if (showSky) dom.skyPill.textContent = 'sky: ' + world.sky.name;
   dom.planetBtn.hidden = world.ic.some(b => b.kind === 'planet') || world.ic.length === 0 || world.ic.length > 4;
   dom.resetBtn.setAttribute('aria-label', 'Reset to ' + world.preset.name); dom.resetBtn.title = 'Reset to ' + world.preset.name;
-  $('pane-bodies').setAttribute('aria-live', world.playing ? 'off' : 'polite');   // read out edited values, but not the running numbers
   refreshSpeed(); markLayout();
 }
 function refreshSpeed() {
@@ -2686,7 +2786,15 @@ function refreshSpeed() {
   dom.speedOut.title = slow ? 'Set to ' + nominal + '×. ' + (throttle.on ? 'Slowed to keep the calculation exact.' : 'Slowed so you can see what is happening.') : '';
   dom.slowerBtn.disabled = ui.speed === 0; dom.fasterBtn.disabled = ui.speed === SPEEDS.length - 1;
 }
-function setSpeed(i) { ui.speed = clamp(i, 0, SPEEDS.length - 1); store.set('speed2', ui.speed); throttle.on = false; refreshSpeed(); }
+function setSpeed(i) { ui.speed = clamp(i, 0, SPEEDS.length - 1); store.set('speed2', ui.speed); throttle.on = false; refreshSpeed(); announce('Speed ' + trimZeros(String(SPEEDS[ui.speed])) + '×'); }
+/* One polite live line for values the person has just changed. The speed readout and the editor's numbers are not live
+ * themselves: they change many times a second while playing or dragging. */
+function announce(text) { dom.announce.textContent = ''; requestAnimationFrame(() => { dom.announce.textContent = text; }); }
+const headingOf = q => (((Math.round(Math.atan2(q.vy, q.vx) * 180 / Math.PI)) % 360) + 360) % 360;
+function sayValue(kind, q) {
+  announce(kind === 'mass' ? 'Mass ' + fmtMass(q.m) : kind === 'x' || kind === 'y' || kind === 'body' ? 'Position ' + signed(q.x, 2) + ', ' + signed(q.y, 2) + ' AU'
+    : 'Velocity ' + sig(Math.hypot(q.vx, q.vy) * V_KMS, 3) + ' km/s, heading ' + headingOf(q) + '°');
+}
 
 /* ------------------------------------------------------------------ customize: bodies */
 let chipSig = '';
@@ -2767,7 +2875,7 @@ function stepField(kind, dir) {
     world.dirMemo[q.id] = a * 180 / Math.PI;
     q.vx = v * Math.cos(a); q.vy = v * Math.sin(a);
   }
-  commitEdit(false);
+  commitEdit(false); sayValue(kind, q);
 }
 function snapTo(v, s, dir) {               // the next multiple of s beyond v, in direction dir
   const k = v / s, r = Math.round(k);
@@ -2808,10 +2916,19 @@ function refreshViewPane() {
     const on = b.dataset.v === document.documentElement.dataset.theme;
     b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
   }
-  for (const b of dom.trailSeg.children) b.setAttribute('aria-checked', String(b.dataset.v === ui.view.trails));
-  for (const b of dom.modeSeg.children) { const on = b.dataset.v === ui.view.mode; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }
+  /* a radio group: the checked one takes the tab stop; with none checked, the first does */
+  const radios = (seg, isOn) => { const items = [...seg.children], any = items.some(isOn); items.forEach((b, i) => { const on = isOn(b); b.setAttribute('aria-checked', String(on)); b.tabIndex = on || (!any && i === 0) ? 0 : -1; }); };
+  radios(dom.trailSeg, b => b.dataset.v === ui.view.trails);
+  radios(dom.modeSeg, b => b.dataset.v === ui.view.mode);
+  const three = dom.modeSeg.querySelector('[data-v="3d"]');
+  if (sky3d.failed) { three.setAttribute('aria-disabled', 'true'); three.title = NO_3D; } else three.removeAttribute('aria-disabled');
+  three.setAttribute('aria-busy', String(!!sky3d.loading && !sky3d.api));
   dom.cameraFields.hidden = !sky3d.on; dom.gridRow.hidden = sky3d.on;   // the 3D sky has no grid: the crosses read as a pattern over the scene
-  if (sky3d.on) for (const b of dom.cameraSeg.children) { const on = b.dataset.v === (sky3d.api.rig.mode === 'follow' ? 'follow' : 'overview'); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }
+  if (sky3d.on) {
+    const rig = sky3d.api.rig;              // after a zoom or a pan the camera is the viewer's own: neither choice is current
+    radios(dom.cameraSeg, b => b.dataset.v === rig.mode);
+    radios(dom.angleSeg, b => Math.abs(+b.dataset.v - rig.goal.phi) < 0.03);
+  }
   document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-checked', String(!!ui.view[b.dataset.view])));
 }
 function selectTab(name, focus) {
@@ -2846,7 +2963,7 @@ function openSheet(name) {
   if (name === 'skies') renderSkies();
   if (name === 'custom') { refreshBodies(true); refreshViewPane(); }
   applyInsets(); markLayout();
-  const target = name === 'custom' ? $('tab-' + ui.tab) : name === 'preset' ? (dom.presetGrid.querySelector('[aria-current="true"]') || s.el.querySelector('[data-close]')) : name === 'skies' ? dom.seedInput : s.el.querySelector('[data-close]');
+  const target = name === 'custom' ? $('tab-' + ui.tab) : name === 'preset' ? (dom.presetGrid.querySelector('[aria-current="true"]') || s.el.querySelector('[data-close]')) : name === 'skies' ? (dom.skyGrid.querySelector('[aria-current="true"]') || s.el.querySelector('[data-close]')) : s.el.querySelector('[data-close]');   // never the seed field: a phone keyboard would cover the skies
   requestAnimationFrame(() => { if (target) target.focus({ preventScroll: true }); });
 }
 function closeSheet(restoreFocus) {
@@ -2858,8 +2975,13 @@ function closeSheet(restoreFocus) {
   if (s.resume) { s.resume = false; if (!world.playing) setPlaying(true); }
   stopRepeat(false);
   applyInsets(); markLayout();
-  if (restoreFocus !== false) s.btn.focus({ preventScroll: true });
+  /* Closed from the keyboard, focus goes back to the control that opened the sheet. Closed by a click or a tap, nothing
+   * keeps focus, so the next Space plays or pauses instead of opening the sheet again. */
+  if (restoreFocus !== false) { if (lastInput.pointer) { if (s.el.contains(document.activeElement)) document.activeElement.blur(); } else s.btn.focus({ preventScroll: true }); }
 }
+const lastInput = { pointer: false };
+window.addEventListener('pointerdown', () => { lastInput.pointer = true; }, true);
+window.addEventListener('keydown', e => { if (!['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) lastInput.pointer = false; }, true);
 const toggleSheet = name => (ui.sheet === name ? closeSheet() : openSheet(name));
 
 let thumbStamp = -1;
@@ -2923,7 +3045,7 @@ function renderHistory(fresh) {
     + '<span><i style="background:' + rgba(theme.ink, 0.85) + '"></i>a civilization</span>';
   dom.histStats.innerHTML =
     tile('Civilizations', String(c.n), c.alive ? 'Civilization ' + c.n + ' is alive, ' + yrs(T1 - c.born) + ' old' : c.over ? 'the planet is gone' : c.exiled ? 'the planet is in exile' : 'none alive now')
-    + tile('Longest civilization', longestCiv[2] ? yrs(longestCiv[1] - longestCiv[0]) : '–', longestCiv[2] ? 'civilization ' + longestCiv[2] : '')
+    + tile('Longest civilization', longestCiv[2] ? yrs(longestCiv[1] - longestCiv[0]) : '–', longestCiv[2] ? 'Civilization ' + longestCiv[2] : '')
     + tile('Time in Stable Eras', Math.round(100 * stable / Math.max(T1, 1e-9)) + '%', 'longest ' + yrs(longestStable))
     + tile('Chaotic Eras', String(chaotic.length), chaotic.length ? 'longest ' + yrs(longestChaotic) : '')
     + tile('Hottest', fmtC(hot).trim(), 'year ' + Math.round(hotT / TU_YEAR)) + tile('Coldest', fmtC(cold).trim(), 'year ' + Math.round(coldT / TU_YEAR))
@@ -3067,9 +3189,9 @@ function hitTest(x, y, slop) {
   }
   if (best) return best;
   for (const q of world.cur) {
-    const m = drawn.get(q.id); if (!m) continue;
+    const m = drawn.get(q.id); if (!m || m.behind) continue;
     const d = Math.hypot(x - m.x, y - m.y);
-    if (d < Math.max(m.r + 10, 26) + slop && d < bd) { bd = d; best = { type: 'body', id: q.id }; }
+    if (d < Math.max(m.vr + 10, 26) + slop && d < bd) { bd = d; best = { type: 'body', id: q.id }; }
   }
   return best;
 }
@@ -3083,22 +3205,25 @@ function onDown(e) {
   drag.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (drag.pointers.size === 2) {
     if (drag.mode === 'body' || drag.mode === 'vel') return;
-    drag.mode = 'pinch'; drag.pinch = pinchState(); setAuto(false); return;
+    drag.mode = 'pinch'; drag.pinch = pinchState(); if (!sky3d.on) setAuto(false); return;   // in 3D the rig decides: a pinch leaves overview but keeps following
   }
   if (drag.pointers.size > 2) return;
   drag.sx = e.clientX; drag.sy = e.clientY; drag.moved = false; drag.primary = e.pointerId;
   drag.slop = e.pointerType === 'mouse' ? 3 : 7;
   drag.hit = place.on ? null : hitTest(e.clientX, e.clientY, e.pointerType === 'mouse' ? 0 : 6);
+  /* While a 3D sky plays, a drag that starts on a body still turns the camera, and a double-tap still follows it: only a
+   * paused sky hands its bodies to the finger. The flat chart pauses on a press, as it always has. */
+  drag.grab = !!drag.hit && !(sky3d.on && world.playing);
   drag.mode = 'pending';
   if (drag.hit && drag.hit.type === 'body') {
     world.sel = drag.hit.id; bodiesDirty = true;
-    if (world.playing) setPlaying(false);
+    if (drag.grab && world.playing) setPlaying(false);
   }
   dom.sky.classList.add('grabbing'); invalidate();
 }
 function onMove(e) {
   const p = drag.pointers.get(e.pointerId);
-  if (place.on) { place.x = wx(e.clientX); place.y = wy(e.clientY); place.hover = true; invalidate(); }
+  if (place.on) { const w = unproj(e.clientX, e.clientY); place.hover = !!w; if (w) { place.x = w[0]; place.y = w[1]; } invalidate(); }
   if (!p) {                                 // hovering with a mouse: show what can be grabbed
     if (e.pointerType === 'mouse' && !place.on) dom.sky.classList.toggle('over-body', !!hitTest(e.clientX, e.clientY, 0));
     return;
@@ -3106,7 +3231,12 @@ function onMove(e) {
   const px = p.x, py = p.y; p.x = e.clientX; p.y = e.clientY;
   if (drag.mode === 'pinch' && drag.pointers.size >= 2) {
     const a = drag.pinch, b = pinchState();
-    if (sky3d.on) { sky3d.api.dollyAt(a.d / Math.max(b.d, 1), b.x, b.y); sky3d.api.rig.pan(b.x - a.x, b.y - a.y, scaleNow()); drag.pinch = b; invalidate(); return; }
+    if (sky3d.on) {
+      const was = sky3d.api.rig.mode;
+      sky3d.api.dollyAt(a.d / Math.max(b.d, 1), b.x, b.y); sky3d.api.panAt(a.x, a.y, b.x, b.y); drag.pinch = b;
+      if (sky3d.api.rig.mode !== was) { syncFitBtn(); refreshViewPane(); }
+      invalidate(); return;
+    }
     const X = wx(a.x), Y = wy(a.y);
     cam.scale = clamp(cam.scale * b.d / Math.max(a.d, 1), 0.02, 2e5);
     cam.x = X - (b.x - view.cx) / cam.scale; cam.y = Y + (b.y - view.cy) / cam.scale;
@@ -3116,7 +3246,7 @@ function onMove(e) {
   if (drag.mode === 'pending') {
     if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < drag.slop) return;
     drag.moved = true;
-    if (drag.hit) {
+    if (drag.hit && drag.grab) {
       beginEdit(null); commitEdit(true);
       const q = bodyById(world.ic, drag.hit.id);
       if (!q) { drag.mode = 'pan'; return; }
@@ -3131,10 +3261,11 @@ function onMove(e) {
   }
   if (drag.mode === 'pan') {
     if (sky3d.on) {                         // a drag turns the camera; with Shift it slides the view across the plane
-      const now = performance.now(), dtm = Math.max(1, now - drag.vt), dx = e.clientX - px, dy = e.clientY - py;
-      if (e.shiftKey) sky3d.api.rig.pan(dx, dy, scaleNow()); else sky3d.api.rig.orbit(dx, dy, view.h);
+      const now = performance.now(), dtm = Math.max(1, now - drag.vt), dx = e.clientX - px, dy = e.clientY - py, was = sky3d.api.rig.mode;
+      if (e.shiftKey) sky3d.api.panAt(px, py, e.clientX, e.clientY); else sky3d.api.rig.orbit(dx, dy, view.h);
       drag.fvx = drag.fvx * 0.5 + (dx / dtm * 1000) * 0.5; drag.fvy = drag.fvy * 0.5 + (dy / dtm * 1000) * 0.5; drag.vt = now;
-      syncFitBtn(); invalidate(); return;
+      if (sky3d.api.rig.mode !== was) { syncFitBtn(); refreshViewPane(); }
+      invalidate(); return;
     }
     cam.x -= (e.clientX - px) / cam.scale; cam.y += (e.clientY - py) / cam.scale; invalidate(); return;
   }
@@ -3157,9 +3288,9 @@ function onUp(e) {
   if (drag.mode === 'pinch') { if (drag.pointers.size < 2) { drag.mode = drag.pointers.size ? 'pan' : null; const r = [...drag.pointers.keys()][0]; if (r !== undefined) drag.primary = r; } if (!drag.pointers.size) dom.sky.classList.remove('grabbing'); return; }
   if (e.pointerId !== drag.primary) return;
   const mode = drag.mode; drag.mode = null; dom.sky.classList.remove('grabbing');
-  if (mode === 'pan' && sky3d.on && !e.shiftKey && performance.now() - drag.vt < 90) sky3d.api.rig.fling(clamp(drag.fvx, -3000, 3000), clamp(drag.fvy, -3000, 3000), view.h);
-  if (mode === 'body' || mode === 'vel') { commitEdit(false); }
-  else if (mode === 'pending' && e.type === 'pointerup' && place.on) { placeAt(wx(e.clientX), wy(e.clientY)); }
+  if (mode === 'pan' && sky3d.on && !e.shiftKey && !reducedMotion && performance.now() - drag.vt < 90) sky3d.api.rig.fling(clamp(drag.fvx, -3000, 3000), clamp(drag.fvy, -3000, 3000), view.h);
+  if (mode === 'body' || mode === 'vel') { commitEdit(false); const q = bodyById(world.ic, drag.id); if (q) sayValue(mode, q); }
+  else if (mode === 'pending' && e.type === 'pointerup' && place.on) { const w = unproj(e.clientX, e.clientY); if (w) placeAt(w[0], w[1]); }
   else if (mode === 'pending' && e.type === 'pointerup') {
     const now = performance.now();
     const again = now - drag.lastTap < 340 && Math.hypot(e.clientX - drag.tapX, e.clientY - drag.tapY) < 32;
@@ -3240,15 +3371,15 @@ function wire() {
     store.set('appearance', b.dataset.v); refreshViewPane();
   });
   dom.trailSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.view.trails = b.dataset.v; store.set('view', ui.view); refreshViewPane(); invalidate(); });
-  dom.modeSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setViewMode(b.dataset.v); });
+  dom.modeSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.v === '3d' && sky3d.failed) { say('no3d', NO_3D, true, { now: true }); return; } setViewMode(b.dataset.v); });
   dom.cameraSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; if (b.dataset.v === 'follow') followBody(world.sel); else setAuto(true); });
-  dom.angleSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; sky3d.api.rig.setTilt(+b.dataset.v); invalidate(); });
+  dom.angleSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; sky3d.api.rig.setTilt(+b.dataset.v); refreshViewPane(); invalidate(); });
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.view; ui.view[k] = !ui.view[k]; store.set('view', ui.view); refreshViewPane(); invalidate();
     if (k === 'drift' && sky3d.api) sky3d.api.rig.drift = !!ui.view.drift;
     if (k === 'com' && ui.view.com) say('com', 'The cross marks the center of mass, the balance point of the whole group. Nothing the bodies do to one another can move it off its straight path.', true, { now: true });
   }));
-  [dom.trailSeg, dom.appearanceSeg, dom.modeSeg, dom.cameraSeg].forEach(seg => seg.addEventListener('keydown', e => {
+  [dom.trailSeg, dom.appearanceSeg, dom.modeSeg, dom.cameraSeg, dom.angleSeg].forEach(seg => seg.addEventListener('keydown', e => {
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
     const items = [...seg.children], i = items.indexOf(document.activeElement); if (i < 0) return;
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
@@ -3259,13 +3390,16 @@ function wire() {
     if (e.defaultPrevented) return;
     const k = e.key;
     if (k === 'Escape') { if (ui.sheet) { closeSheet(); e.preventDefault(); } else if (place.on) { exitPlacing(true); e.preventDefault(); } return; }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k.toLowerCase() === 'z') { undo(); e.preventDefault(); return; }
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (ui.sheet && SHEETS[ui.sheet].modal) return;
-    const t = e.target, onControl = t && t.closest && t.closest('button, input, summary, a, [tabindex="0"]');
-    if (k === ' ' || k === 'Spacebar') { if (onControl) return; setPlaying(!world.playing); e.preventDefault(); return; }
-    if (t && t.tagName === 'INPUT') return;
-    if (sky3d.on && !onControl) {           // turning, tilting and zooming the 3D camera
+    const t = e.target, typing = t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'range'));
+    const modal = ui.sheet && SHEETS[ui.sheet].modal;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k.toLowerCase() === 'z') { if (typing || modal) return; undo(); e.preventDefault(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey || modal) return;
+    /* Space plays and pauses, except on a control the keyboard has reached: there it presses the control. A button that
+     * only holds focus because it was clicked, or because a sheet it opened has closed, does not take the key. */
+    const onControl = t && t.closest && t.closest('button, input, summary, a, [tabindex="0"]'), keyed = !!onControl && onControl.matches(':focus-visible');
+    if (k === ' ' || k === 'Spacebar') { if (typing || keyed) return; if (!e.repeat) setPlaying(!world.playing); e.preventDefault(); return; }
+    if (typing) return;
+    if (sky3d.on && !keyed) {           // turning, tilting and zooming the 3D camera
       const rig = sky3d.api.rig, step = Math.PI / 12; let used = true;
       if (k === 'ArrowLeft') rig.nudge(step, 0); else if (k === 'ArrowRight') rig.nudge(-step, 0);
       else if (k === 'ArrowUp') rig.nudge(0, -step / 2); else if (k === 'ArrowDown') rig.nudge(0, step / 2);
@@ -3275,6 +3409,7 @@ function wire() {
       if (used) { syncFitBtn(); refreshViewPane(); invalidate(); e.preventDefault(); return; }
     }
     const c = k.toLowerCase();
+    if (e.repeat && /^[rfcvhs]$/.test(c)) { e.preventDefault(); return; }   // holding a key must not restart or flip the view over and over
     if (c === 'r') restart(); else if (c === 'f') setAuto(true); else if (c === 'c') toggleSheet('custom'); else if (c === 'v') setViewMode(ui.view.mode === '3d' ? 'flat' : '3d');
     else if (c === 'h' && !dom.eraOut.hidden) toggleSheet('history'); else if (c === 's' && !dom.skyBtn.hidden) toggleSheet('skies');
     else if (k === '+' || k === '=') setSpeed(ui.speed + 1); else if (k === '-' || k === '_') setSpeed(ui.speed - 1); else return;

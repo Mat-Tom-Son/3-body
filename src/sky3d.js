@@ -7,14 +7,20 @@ import { LineSegmentsGeometry } from '../vendor/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/LineMaterial.js';
 import { CameraRig, cameraOffset, climateTint, atmosphereTint, spinAngle, SPIN_PERIODS, STAR_PHASE, toneOf, clamp, TAU } from './sky3d-model.js';
 
-const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200;
+const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200, LINE_PX = 1.8;
 const LUM = b => (b.meta && b.meta.lum != null ? b.meta.lum : Math.pow(b.m, 3.5));   // a published brightness when the body carries one
 const SIZE_GAIN = { star: 1, planet: 1.3, moon: 1.25, giant: 1.15 };   // worlds are a few pixels across; a sphere needs a little more than a disc to read
 const assetRoot = new URL('../assets/bodies/', import.meta.url);
 
-export function createSky3D({ canvas }) {
+export function createSky3D({ canvas, onContextLost, onContextRestored, onTextureError }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  /* Only the lit worlds are tone mapped (every other material opts out), so a world close to a bright sun rolls off
+   * gently instead of clipping to a flat disc, while suns, glows and trails keep the flat page's colours. */
+  renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1;
+  const lost = e => { e.preventDefault(); if (onContextLost) onContextLost(); };
+  const restored = () => { invalidate(); if (onContextRestored) onContextRestored(); };
+  canvas.addEventListener('webglcontextlost', lost); canvas.addEventListener('webglcontextrestored', restored);
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.01, 6000);
   const rig = new CameraRig();
@@ -24,7 +30,6 @@ export function createSky3D({ canvas }) {
   const theme = { ink: [234, 242, 250], field: [8, 23, 41], moon: [174, 185, 198] };
   /* The page gives sRGB bytes; three.js works in linear light, so every colour is converted on the way in. */
   const toColor = rgb => new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace);
-  const linear = rgb => { const c = toColor(rgb); return [c.r, c.g, c.b]; };
 
   /* ---------------------------------------------------------------- fixed scenery */
   const ambient = new THREE.AmbientLight(0x8fa0cc, 0.3); scene.add(ambient);
@@ -37,14 +42,24 @@ export function createSky3D({ canvas }) {
       p[3 * i] = r * Math.cos(a); p[3 * i + 1] = 2600 * z; p[3 * i + 2] = r * Math.sin(a); sz[i] = rnd();
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-    const m = new THREE.PointsMaterial({ color: 0xaab6d8, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0.7, depthWrite: false });
+    const m = new THREE.PointsMaterial({ color: 0xaab6d8, size: 1.7, sizeAttenuation: false, transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false });
     const pts = new THREE.Points(g, m); pts.frustumCulled = false; return pts;
   })();
   scene.add(starfield);
+  /* One point light per sun, from a pool that only ever grows: three.js compiles its lit shaders for a number of lights,
+   * so a merger, a swallowed sun or a setup with fewer suns must not change that number. Spare lights stay dark. */
+  const lights = [];
+  const ensureLights = n => { while (lights.length < n) { const l = new THREE.PointLight(0xffffff, 0, 0, 2); scene.add(l); lights.push(l); } };
+  ensureLights(3);
 
   /* ---------------------------------------------------------------- textures, geometry, shaders */
   const loader = new THREE.TextureLoader();
-  const texture = name => { const t = loader.load(new URL(`${name}.webp`, assetRoot).href, () => invalidate()); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return t; };
+  /* A map that fails to load becomes plain mid-grey, so a world is drawn in its climate colour rather than black. */
+  const plain = () => { const c = document.createElement('canvas'); c.width = c.height = 2; const k = c.getContext('2d'); k.fillStyle = '#9a9a9a'; k.fillRect(0, 0, 2, 2); return c; };
+  const texture = name => {
+    const t = loader.load(new URL(`${name}.webp`, assetRoot).href, () => invalidate(), undefined, () => { t.image = plain(); t.needsUpdate = true; invalidate(); if (onTextureError) onTextureError(name); });
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); return t;
+  };
   const maps = { star: texture('star-surface'), planet: texture('planet-surface'), moon: texture('moon-surface') };
   const glowMap = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -57,24 +72,28 @@ export function createSky3D({ canvas }) {
   let dirty = 0;
   const invalidate = () => { dirty = 2; };
 
-  /* A lit surface whose colours can be washed toward ice or ember with one mix in the fragment shader. */
+  /* A lit surface whose colours can be washed toward ice or ember with one mix in the fragment shader. Sunlight arrives at
+   * its real strength, which spans a thousandfold between a hot inner world and a cold giant; uExposure compresses that to
+   * the 0.4 power of the light received, so every world shows a day side and a terminator, and a brighter sun still reads
+   * as brighter. */
   function worldMaterial(map, roughness) {
     const material = new THREE.MeshStandardMaterial({ map, roughness, metalness: 0, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.16 });   // the night side keeps a faint picture of itself
-    const tint = { value: new THREE.Color(1, 1, 1) }, amount = { value: 0 };
+    const tint = { value: new THREE.Color(1, 1, 1) }, amount = { value: 0 }, exposure = { value: 1 };
     material.onBeforeCompile = shader => {
-      shader.uniforms.uTint = tint; shader.uniforms.uTintAmount = amount;
+      shader.uniforms.uTint = tint; shader.uniforms.uTintAmount = amount; shader.uniforms.uExposure = exposure;
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uTint;\nuniform float uTintAmount;')
+        .replace('#include <common>', '#include <common>\nuniform vec3 uTint;\nuniform float uTintAmount;\nuniform float uExposure;')
         /* The climate wash keeps the map's light and dark structure, so ice or ember still show the turning surface. */
-        .replace('#include <map_fragment>', '#include <map_fragment>\n\tfloat mapLum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));\n\tdiffuseColor.rgb = mix(diffuseColor.rgb, uTint * (0.35 + 1.3 * mapLum), uTintAmount);');
+        .replace('#include <map_fragment>', '#include <map_fragment>\n\tfloat mapLum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));\n\tdiffuseColor.rgb = mix(diffuseColor.rgb, uTint * (0.35 + 1.3 * mapLum), uTintAmount);')
+        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n\treflectedLight.directDiffuse *= uExposure;\n\treflectedLight.directSpecular *= uExposure;');
     };
     material.customProgramCacheKey = () => 'sky3d-world';
-    material.userData.tint = tint; material.userData.amount = amount;
+    material.userData.tint = tint; material.userData.amount = amount; material.userData.exposure = exposure;
     return material;
   }
   /* A sun: its own light, granulation from the shared map, darker toward the limb as real stars are. */
   function starMaterial(color) {
-    const material = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveMap: maps.star, emissiveIntensity: 0.55, roughness: 1, metalness: 0 });
+    const material = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveMap: maps.star, emissiveIntensity: 0.55, roughness: 1, metalness: 0, toneMapped: false });
     material.onBeforeCompile = shader => {
       /* The granulation map is a low-contrast grey (about 0.22 linear); stretch it around its mean so the cells read as
        * the sun turns, then darken toward the limb. */
@@ -86,55 +105,59 @@ export function createSky3D({ canvas }) {
     material.customProgramCacheKey = () => 'sky3d-star';
     return material;
   }
-  /* A thin atmosphere: a fresnel rim on a slightly larger shell, brighter on the sunlit side. */
+  /* A thin atmosphere: a fresnel rim on a slightly larger shell, brighter on the sunlit side. The position goes through
+   * modelViewMatrix, which three.js composes on the CPU in double precision, so a world hundreds of AU from the origin
+   * does not jitter at close range. Additive on the dark field (a glow adds light), blended normally on the light one. */
   function atmosphereMaterial() {
     return new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0.45, 0.75, 1) }, uStrength: { value: 0.8 }, uLight: { value: new THREE.Vector3(1, 0, 0) } },
-      vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vW;\nvoid main() { vec4 wp = modelMatrix * vec4(position, 1.0); vW = normalize(mat3(modelMatrix) * normal); vN = normalize(normalMatrix * normal); vV = normalize(-(modelViewMatrix * vec4(position, 1.0)).xyz); gl_Position = projectionMatrix * viewMatrix * wp; }',
-      fragmentShader: 'uniform vec3 uColor; uniform float uStrength; uniform vec3 uLight; varying vec3 vN; varying vec3 vV; varying vec3 vW;\nvoid main() { float rim = pow(1.0 - clamp(dot(vN, vV), 0.0, 1.0), 2.6); float sun = 0.3 + 0.7 * clamp(dot(vW, uLight) * 0.8 + 0.35, 0.0, 1.0); gl_FragColor = vec4(uColor, 1.0) * rim * sun * uStrength; }',
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
+      uniforms: { uColor: { value: new THREE.Color(0.45, 0.75, 1) }, uStrength: { value: 0.8 }, uLight: { value: new THREE.Vector3(1, 0, 0) }, uAdd: { value: additive ? 1 : 0 } },
+      vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vW;\nvoid main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vW = normalize(mat3(modelMatrix) * normal); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+      fragmentShader: 'uniform vec3 uColor; uniform float uStrength; uniform vec3 uLight; uniform float uAdd; varying vec3 vN; varying vec3 vV; varying vec3 vW;\nvoid main() { float rim = pow(1.0 - clamp(dot(vN, vV), 0.0, 1.0), 2.6); float sun = 0.3 + 0.7 * clamp(dot(vW, uLight) * 0.8 + 0.35, 0.0, 1.0); float a = clamp(rim * sun * uStrength, 0.0, 1.0); gl_FragColor = vec4(uColor, uAdd > 0.5 ? a * a : a);\n#include <colorspace_fragment>\n}',
+      transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, side: THREE.FrontSide, toneMapped: false,
     });
   }
 
   /* ---------------------------------------------------------------- bodies */
-  const actors = new Map(), lineMaterials = new Set();
+  const actors = new Map(), live = new Set(), stars = [];
   const kindOf = b => (b.m >= 0.05 && b.kind !== 'planet' && b.kind !== 'moon' ? 'star' : b.kind === 'moon' ? 'moon' : b.kind === 'planet' ? 'planet' : 'giant');
   function makeActor(b, rgb) {
     const kind = kindOf(b), group = new THREE.Group(), color = toColor(rgb);
-    let mesh, glow = null, light = null, atmo = null;
+    let mesh, glow = null, atmo = null;
     if (kind === 'star') {
       mesh = new THREE.Mesh(sphere, starMaterial(color.clone().multiplyScalar(1.15)));
-      glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap, color, transparent: true, depthWrite: false, opacity: 0.85 }));
-      light = new THREE.PointLight(color, 1, 0, 2);
-      group.add(glow, light);
+      glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowMap, color, transparent: true, depthWrite: false, opacity: 0.85, toneMapped: false }));
+      group.add(glow);
     } else if (kind === 'planet') {
       mesh = new THREE.Mesh(sphere, worldMaterial(maps.planet, 0.88));
       atmo = new THREE.Mesh(sphereLow, atmosphereMaterial()); atmo.scale.setScalar(1.07); atmo.renderOrder = 2; group.add(atmo);
     } else if (kind === 'moon') mesh = new THREE.Mesh(sphere, worldMaterial(maps.moon, 0.95));
     else { mesh = new THREE.Mesh(sphere, worldMaterial(maps.moon, 0.75)); mesh.material.userData.tint.value.set(0.85, 0.6, 0.3); mesh.material.userData.amount.value = 0.55; }
-    /* Spin about the body's own axis first, then lean that axis: a fixed axial tilt rather than a wobble. */
+    /* Spin about the body's own axis first, then lean that axis: a fixed axial tilt rather than a wobble. A tidally
+     * locked world stands upright, or the face it keeps toward its sun would nod up and down once an orbit. */
     mesh.rotation.order = 'ZYX';
-    mesh.rotation.z = { star: 0, planet: 0.41, moon: 0.12, giant: 0.2 }[kind];
+    mesh.rotation.z = b.meta && b.meta.locked ? 0 : { star: 0, planet: 0.41, moon: 0.12, giant: 0.2 }[kind];
     group.add(mesh);
     const geometry = new LineSegmentsGeometry();
     LineSegmentsGeometry.prototype.setPositions.call(geometry, new Float32Array(SEG_CAP * 6));
     LineSegmentsGeometry.prototype.setColors.call(geometry, new Float32Array(SEG_CAP * 6));
     geometry.instanceCount = 0;
-    /* Ribbons blend normally even on the dark theme: additive segments would double up into beads at every joint. */
-    const material = new LineMaterial({ color: 0xffffff, linewidth: 1.8 * view.dpr, vertexColors: true, worldUnits: false, transparent: false, opacity: 1, depthWrite: false });
-    material.resolution.set(view.w * view.dpr, view.h * view.dpr);
-    lineMaterials.add(material);
+    /* Ribbons blend normally even on the dark theme: additive segments would double up into beads at every joint. The
+     * width is in CSS pixels: LineSegments2 sets the resolution from the renderer's viewport before every draw. */
+    const material = new LineMaterial({ color: 0xffffff, linewidth: LINE_PX, vertexColors: true, worldUnits: false, transparent: false, opacity: 1, depthWrite: false, toneMapped: false });
     const line = new LineSegments2(geometry, material); line.frustumCulled = false; line.renderOrder = -1;
     scene.add(group, line);
-    return { kind, group, mesh, glow, light, atmo, line, geometry, material, tone: kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind, trailAt: -1, trailMode: '' };
+    return { kind, group, mesh, glow, atmo, line, geometry, material, locked: !!(b.meta && b.meta.locked), tone: kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind, trailAt: -1, trailMode: '' };
   }
   function dropActor(id) {
     const a = actors.get(id); if (!a) return;
-    scene.remove(a.group, a.line); a.geometry.dispose(); a.material.dispose(); lineMaterials.delete(a.material); a.mesh.material.dispose();
+    scene.remove(a.group, a.line); a.geometry.dispose(); a.material.dispose(); a.mesh.material.dispose();
     if (a.glow) a.glow.material.dispose(); if (a.atmo) a.atmo.material.dispose();
     actors.delete(id);
   }
   const tmpColor = new THREE.Color(), bg = new THREE.Color();
+  /* sRGB byte to linear light. The fade is mixed in sRGB, as the flat chart's canvas blends it, then converted: a mix in
+   * linear light would wash every trail out toward the pale field of the light appearance. */
+  const LIN = Float32Array.from({ length: 256 }, (_, i) => { const c = i / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
   /* The trail: the flat page's own ring buffer and time window, thinned to the segment budget, fading toward the tail. */
   function fillTrail(a, tr, head, rgb, mode, tNow, tMin) {
     const pos = a.geometry.attributes.instanceStart.data, col = a.geometry.attributes.instanceColorStart.data, P = pos.array, C = col.array;
@@ -142,11 +165,11 @@ export function createSky3D({ canvas }) {
     for (let k = tr.len - 1; k >= 0; k--) { const i = tr.at(k), t = tr.t[i]; if (t > tNow) continue; if (t < tMin) break; n++; }
     const stride = Math.max(1, Math.ceil((n + 1) / (SEG_CAP + 1))), m = Math.min(SEG_CAP + 1, Math.floor(n / stride) + 1);
     if (m < 2) { a.geometry.instanceCount = 0; return; }
-    const long = mode === 'long', base = 0.95, [r, g, b] = linear(rgb);
+    const long = mode === 'long', base = 0.95, [r, g, b] = rgb, [fr, fg, fb] = theme.field;
     let j = 0, px = head.x, pz = -head.y, seg = 0;
     const put = (x, z, f) => {
-      let al = long ? base * (0.3 + 0.7 * f * f) : base * Math.pow(f, 1.5);
-      const cr = bg.r + (r - bg.r) * al, cg = bg.g + (g - bg.g) * al, cb = bg.b + (b - bg.b) * al;
+      const al = long ? base * (0.3 + 0.7 * f * f) : base * Math.pow(f, 1.5);
+      const cr = LIN[Math.round(fr + (r - fr) * al)], cg = LIN[Math.round(fg + (g - fg) * al)], cb = LIN[Math.round(fb + (b - fb) * al)];
       if (j > 0) { const o = 6 * seg; P[o] = px; P[o + 1] = 0; P[o + 2] = pz; P[o + 3] = x; P[o + 4] = 0; P[o + 5] = z; C[o] = C[o + 3] = cr; C[o + 1] = C[o + 4] = cg; C[o + 2] = C[o + 5] = cb; seg++; }
       px = x; pz = z; j++;
     };
@@ -157,7 +180,9 @@ export function createSky3D({ canvas }) {
       if (seen++ % stride) continue;
       put(tr.x[i], -tr.y[i], 1 - (j - 1) / (m - 1));
     }
-    a.geometry.instanceCount = seg; pos.needsUpdate = true; col.needsUpdate = true;
+    a.geometry.instanceCount = seg;
+    pos.clearUpdateRanges(); pos.addUpdateRange(0, seg * 6); pos.needsUpdate = true;   // upload the segments in use, not the whole budget
+    col.clearUpdateRanges(); col.addUpdateRange(0, seg * 6); col.needsUpdate = true;
   }
 
   /* ---------------------------------------------------------------- camera */
@@ -168,6 +193,7 @@ export function createSky3D({ canvas }) {
     camera.position.copy(camPos); camera.lookAt(target);
     camera.near = Math.max(0.0005, c.dist * 0.004); camera.far = Math.max(6000, c.dist * 60); camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
+    starfield.position.copy(camPos);       // the stars sit at infinity: they turn with the view but never come closer
     forward.subVectors(target, camPos).normalize();
     pxPerWorld = (view.h / 2) / (c.dist * tanFull);
   }
@@ -178,9 +204,8 @@ export function createSky3D({ canvas }) {
   }
   /* Screen position of a point on the plane, with the pixels per world unit at its depth; `behind` when it is behind the camera. */
   function project(x, y) {
-    tmp.set(x, 0, -y);
-    const depth = tmp.clone().sub(camPos).dot(forward);
-    tmp.project(camera);
+    const depth = (x - camPos.x) * forward.x - camPos.y * forward.y + (-y - camPos.z) * forward.z;
+    tmp.set(x, 0, -y).project(camera);
     const behind = depth < 1e-4;
     /* A point behind the camera projects mirrored through the centre; flip it back and push it well off screen, so the
      * chart's edge marker still points the right way instead of to a corner. */
@@ -206,56 +231,80 @@ export function createSky3D({ canvas }) {
     rig.cur.tx += dx; rig.cur.tz += dz; rig.goal.tx += dx; rig.goal.tz += dz;
     applyCamera();
   }
+  /* Slide the view so that the point on the plane under (x0, y0) ends up under (x1, y1): a drag that pins the plane to the
+   * finger at any tilt. Falls back to the rig's estimate when either point is above the horizon. */
+  function panAt(x0, y0, x1, y1) {
+    if (rig.mode === 'follow') return;
+    const a = unproject(x0, y0), b = unproject(x1, y1);
+    if (a && b) rig.shift(a[0] - b[0], -(a[1] - b[1])); else rig.pan(x1 - x0, y1 - y0, pxPerWorld);
+    applyCamera(); invalidate();
+  }
   function updateCamera(env) {
     const pad = env.pad || 34, s = env.safe || { l: 0, t: 0, r: view.w, b: view.h };
     const tanV = tanFull * Math.max(30, (s.b - s.t) / 2 - pad) / (view.h / 2), tanH = tanFull * camera.aspect * Math.max(30, (s.r - s.l) / 2 - pad) / (view.w / 2);
-    const moved = rig.update({ dt: env.dt, points: env.points ? env.points.map(([x, y]) => [x, -y]) : null, follow: env.follow ? [env.follow[0], -env.follow[1]] : null,
+    if (env.points) for (const p of env.points) p[1] = -p[1];   // the page hands over fresh points each frame; flip them to scene z in place
+    const moved = rig.update({ dt: env.dt, points: env.points, follow: env.follow ? [env.follow[0], -env.follow[1]] : null,
       followDefault: env.followDefault, minHalf: env.minHalf, tanH, tanV, playing: env.playing, reduced: env.reduced, hold: env.hold });
     applyCamera();
     return moved;
   }
 
   /* ---------------------------------------------------------------- drawing */
-  const lightDir = new THREE.Vector3();
+  const lightDir = new THREE.Vector3(), white = new THREE.Color(1, 1, 1), byBrightness = (p, q) => LUM(q) - LUM(p);
+  /* Direct light on a world scales as received^0.4 (see worldMaterial): about Earth's daylight at 1 AU from the Sun. */
+  const DAY = { dark: 1.6, light: 1.35 };
   function render(frame) {
     const { bodies, drawn, trails, trailMode, tNow, tMin, climates, spinTime, quality, colorOf } = frame;
-    const live = new Set();
-    let brightest = null, bright = 0;
-    for (const b of bodies) if (kindOf(b) === 'star') { const L = LUM(b); if (L > bright) { bright = L; brightest = b; } }
+    live.clear(); stars.length = 0;
+    for (const b of bodies) if (kindOf(b) === 'star') stars.push(b);
+    stars.sort(byBrightness);
+    ensureLights(stars.length);
+    for (let i = 0; i < lights.length; i++) {
+      const l = lights[i], b = stars[i];
+      if (!b) { l.intensity = 0; continue; }
+      const rgb = colorOf(b);
+      l.position.set(b.x, 0, -b.y); l.color.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace);
+      l.intensity = Math.PI * LUM(b);      // irradiance L/d² in Earth units: a white surface at 1 AU from the Sun shows its own colour
+    }
+    const brightest = stars[0] || null;
     for (const b of bodies) {
       live.add(b.id);
       const rgb = colorOf(b), d = drawn.get(b.id);
       let a = actors.get(b.id);
-      const kind = kindOf(b), tone = kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind;
-      if (a && (a.kind !== kind || a.tone !== tone)) { dropActor(b.id); a = null; }   // the same id is another body after a setup change
+      const kind = kindOf(b), tone = kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind, locked = !!(b.meta && b.meta.locked);
+      if (a && (a.kind !== kind || a.tone !== tone || a.locked !== locked)) { dropActor(b.id); a = null; }   // the same id is another body after a setup change
       if (!a) { a = makeActor(b, rgb); actors.set(b.id, a); }
       const s = d && d.s ? d.s : pxPerWorld, r = (d ? d.r : 8) * SIZE_GAIN[a.kind] / s;
       a.group.position.set(b.x, 0, -b.y);
       a.mesh.scale.setScalar(r);
       a.mesh.rotation.y = spinAngle(spinTime, SPIN_PERIODS[a.tone]) + (a.kind === 'star' ? STAR_PHASE[a.tone] : 0);
-      if (b.meta && b.meta.locked) {        // tidally locked: one face stays toward the sun that lights it most
+      if (locked) {                         // tidally locked: one face stays toward the sun that lights it most
         let host = null, bf = 0;
-        for (const q of bodies) if (q !== b && kindOf(q) === 'star') { const f = LUM(q) / ((q.x - b.x) ** 2 + (q.y - b.y) ** 2); if (f > bf) { bf = f; host = q; } }
+        for (const q of stars) if (q !== b) { const f = LUM(q) / ((q.x - b.x) ** 2 + (q.y - b.y) ** 2); if (f > bf) { bf = f; host = q; } }
         if (host) a.mesh.rotation.y = Math.atan2(host.y - b.y, host.x - b.x);
       }
-      a.mesh.visible = quality < 3;
       if (a.kind === 'star') {
         tmpColor.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace);
         a.mesh.material.emissive.copy(tmpColor).multiplyScalar(1.15);
-        a.glow.material.color.copy(tmpColor); a.glow.material.opacity = additive ? 0.85 : 0.38; a.glow.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+        a.glow.material.color.copy(tmpColor); a.glow.material.opacity = additive ? 0.85 : 0.5; a.glow.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
         a.glow.scale.setScalar(r * GLOW_SCALE);
-        a.light.color.copy(tmpColor); a.light.intensity = (additive ? 4.8 : 6) * LUM(b);
-      } else if (a.kind === 'planet' || a.kind === 'moon') {
-        const c = climates ? (climates.get(b.id) ?? 2) : 2, tint = climateTint(c), u = a.mesh.material.userData;
-        u.tint.value.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]); u.amount.value = tint.amount;
-        a.mesh.material.emissive.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace).lerp(new THREE.Color(1, 1, 1), 0.5);
-        if (a.atmo) {
-          a.atmo.visible = quality < 1;
-          const at = atmosphereTint(c), au = a.atmo.material.uniforms;
-          au.uColor.value.setRGB(at.rgb[0], at.rgb[1], at.rgb[2]); au.uStrength.value = at.strength * (additive ? 1 : 0.55);
-          if (brightest) lightDir.set(brightest.x - b.x, 0, -(brightest.y - b.y)).normalize(); else lightDir.set(1, 0, 0);
-          au.uLight.value.copy(lightDir);
-          a.atmo.scale.setScalar(r * 1.07);
+      } else {
+        let flux = 0;
+        for (const q of stars) if (q !== b) flux += LUM(q) / Math.max(1e-12, (q.x - b.x) ** 2 + (q.y - b.y) ** 2);
+        const u = a.mesh.material.userData;
+        u.exposure.value = Math.min(1e4, (additive ? DAY.dark : DAY.light) * Math.pow(Math.max(flux, 1e-9), -0.6));
+        if (a.kind === 'planet' || a.kind === 'moon') {
+          const c = climates ? (climates.get(b.id) ?? 2) : 2, tint = climateTint(c);
+          u.tint.value.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]); u.amount.value = tint.amount;
+          a.mesh.material.emissive.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace).lerp(white, 0.5);
+          if (a.atmo) {
+            a.atmo.visible = quality < 2;
+            const at = atmosphereTint(c), au = a.atmo.material.uniforms;
+            au.uColor.value.setRGB(at.rgb[0], at.rgb[1], at.rgb[2], THREE.SRGBColorSpace); au.uStrength.value = at.strength * (additive ? 1 : 0.55);
+            if (brightest) lightDir.set(brightest.x - b.x, 0, -(brightest.y - b.y)).normalize(); else lightDir.set(1, 0, 0);
+            au.uLight.value.copy(lightDir);
+            a.atmo.scale.setScalar(r * 1.07);
+          }
         }
       }
       const tr = trails && trails.get(b.id);
@@ -266,7 +315,7 @@ export function createSky3D({ canvas }) {
         a.line.visible = true;
       } else a.line.visible = false;
     }
-    for (const id of [...actors.keys()]) if (!live.has(id)) dropActor(id);
+    for (const id of actors.keys()) if (!live.has(id)) dropActor(id);   // deleting the current entry while iterating a Map is safe
     renderer.render(scene, camera);
     if (dirty > 0) dirty--;
   }
@@ -277,23 +326,28 @@ export function createSky3D({ canvas }) {
     renderer.setPixelRatio(view.dpr); renderer.setSize(view.w, view.h, false);
     camera.aspect = view.w / view.h;
     camera.setViewOffset(view.w, view.h, view.w / 2 - view.cx, view.h / 2 - view.cy, view.w, view.h); camera.updateProjectionMatrix();
-    for (const m of lineMaterials) { m.resolution.set(view.w * view.dpr, view.h * view.dpr); m.linewidth = 1.8 * view.dpr; }
     applyCamera(); invalidate();
   }
   function setQuality(q) { if (q !== view.quality) { view.quality = q; resize(view.w, view.h, view.dpr); } }
+  const ambientDark = new THREE.Color(0x8fa0cc);
   function setTheme(t) {
     theme.ink = t.ink; theme.field = t.field; theme.moon = t.moon; additive = !!t.additive; themeStamp++;
     bg.copy(toColor(t.field)); scene.background = bg.clone();
     starfield.visible = additive;
-    ambient.intensity = additive ? 0.22 : 0.9; ambient.color.copy(additive ? new THREE.Color(0x8fa0cc) : toColor(t.field));
+    ambient.intensity = additive ? 0.22 : 0.9; ambient.color.copy(additive ? ambientDark : toColor(t.field));
     hemi.intensity = additive ? 0.18 : 0.35;
-    for (const a of actors.values()) if (a.atmo) a.atmo.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    for (const a of actors.values()) if (a.atmo) { a.atmo.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending; a.atmo.material.uniforms.uAdd.value = additive ? 1 : 0; }
     invalidate();
   }
-  function clear() { for (const id of [...actors.keys()]) dropActor(id); }
-  function dispose() { clear(); renderer.dispose(); sphere.dispose(); sphereLow.dispose(); for (const m of Object.values(maps)) m.dispose(); glowMap.dispose(); }
+  function clear() { for (const id of actors.keys()) dropActor(id); }
+  function dispose() {
+    clear(); canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored);
+    for (const l of lights) { scene.remove(l); l.dispose(); }
+    starfield.geometry.dispose(); starfield.material.dispose();
+    renderer.dispose(); sphere.dispose(); sphereLow.dispose(); for (const m of Object.values(maps)) m.dispose(); glowMap.dispose();
+  }
 
   applyCamera();
-  return { rig, camera, scene, renderer, resize, setQuality, setTheme, setCenter, project, unproject, dollyAt, updateCamera, render, clear, dispose,
-    get pxPerWorld() { return pxPerWorld; }, get dirty() { return dirty > 0; }, invalidate };
+  return { rig, camera, scene, renderer, resize, setQuality, setTheme, setCenter, project, unproject, dollyAt, panAt, updateCamera, render, clear, dispose,
+    sizeGain: b => SIZE_GAIN[kindOf(b)], get pxPerWorld() { return pxPerWorld; }, get dirty() { return dirty > 0; }, invalidate };
 }

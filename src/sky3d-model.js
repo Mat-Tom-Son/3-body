@@ -101,13 +101,19 @@ export class CameraRig {
     if (this.mode === 'follow') this.followDist = this.goal.dist;
     this.touch();
   }
-  /* Slide the target across the plane by a screen offset (pixels), at the target's own scale. */
+  /* Slide the target across the plane by a screen offset (pixels), at the target's own scale. The plane is foreshortened
+   * by the tilt, so a vertical move covers 1/cos(phi) as much ground as a sideways one. The page anchors the plane under
+   * the finger exactly with shift(); this is the fallback when the pointer is above the horizon. */
   pan(dx, dy, pxPerWorld) {
     if (this.mode === 'follow') return;
     const { right, forward } = basisOf(this.cur.theta, this.cur.phi), f = Math.hypot(forward[0], forward[2]) || 1;
-    const ax = forward[0] / f, az = forward[2] / f, w = 1 / Math.max(1e-9, pxPerWorld);
-    this.goal.tx += (-dx * right[0] + dy * ax) * w; this.goal.tz += (-dx * right[2] + dy * az) * w;
-    this.cur.tx = this.goal.tx; this.cur.tz = this.goal.tz;
+    const ax = forward[0] / f, az = forward[2] / f, w = 1 / Math.max(1e-9, pxPerWorld), wy = w / Math.max(0.2, Math.cos(this.cur.phi));
+    this.shift(-dx * right[0] * w + dy * ax * wy, -dx * right[2] * w + dy * az * wy);
+  }
+  /* Move the target across the plane by a distance in scene units. Leaves overview for manual; following ignores it. */
+  shift(dx, dz) {
+    if (this.mode === 'follow') return;
+    this.goal.tx += dx; this.goal.tz += dz; this.cur.tx = this.goal.tx; this.cur.tz = this.goal.tz;
     if (this.mode === 'overview') this.setMode('manual');
     this.touch();
   }
@@ -118,6 +124,7 @@ export class CameraRig {
     const { dt, cur, goal } = { dt: Math.max(0, env.dt || 0), cur: this.cur, goal: this.goal };
     this.idle += dt;
     const reduced = !!env.reduced, hold = !!env.hold;
+    if (reduced) this.vTheta = this.vPhi = 0;   // reduced motion: a drag turns the camera and stops with the finger
     /* inertia from a fling, then a slow turn while nothing else is happening */
     if (this.vTheta || this.vPhi) {
       goal.theta += this.vTheta * dt; goal.phi = clamp(goal.phi + this.vPhi * dt, this.minPhi, this.maxPhi);
@@ -141,15 +148,15 @@ export class CameraRig {
     /* easing: angles always, target with velocity feed-forward, distance in log space (quick to pull back, slow to close in) */
     let moved = false;
     if (this.cut || reduced) {
-      Object.assign(cur, goal); this.cut = false; this.prevGoal = { ...goal }; this.vtx = this.vtz = 0; moved = true;
+      Object.assign(cur, goal); this.cut = false; this.prevGoal = Object.assign(this.prevGoal || {}, goal); this.vtx = this.vtz = 0; moved = true;
     } else {
       const ka = ease(dt, 6), kp = ease(dt, 2.6);
       if (this.prevGoal && dt > 0 && !hold) {
         const a = ease(dt, 2.5);
         this.vtx += ((goal.tx - this.prevGoal.tx) / dt - this.vtx) * a; this.vtz += ((goal.tz - this.prevGoal.tz) / dt - this.vtz) * a;
       }
-      this.prevGoal = { ...goal };
-      const before = { ...cur };
+      this.prevGoal = Object.assign(this.prevGoal || {}, goal);
+      const before = Object.assign(this.before || (this.before = {}), cur);
       cur.theta += (goal.theta - cur.theta) * ka; cur.phi += (goal.phi - cur.phi) * ka;
       if (!hold) {
         /* following locks onto the body once the short blend-in is over: at close range any lag would lose it */
@@ -169,11 +176,17 @@ export class CameraRig {
     }
     return moved;
   }
+  /* fitDistance for points on the plane measured from `at`, without building a relative copy of every point each frame */
   distanceFor(points, at, env, marginScale) {
-    const basis = basisOf(at.theta, at.phi), rel = [];
-    for (const [x, z] of points) rel.push([x - at.tx, 0, z - at.tz]);
+    const { right, up, forward } = basisOf(at.theta, at.phi), margin = 1.12 * marginScale, tanH = env.tanH, tanV = env.tanV;
+    let need = 0.05;
+    const fit = (x, z) => {
+      const s = x * forward[0] + z * forward[2], u = Math.abs(x * right[0] + z * right[2]), v = Math.abs(x * up[0] + z * up[2]);
+      need = Math.max(need, u * margin / tanH - s, v * margin / tanV - s);
+    };
+    for (const p of points) fit(p[0] - at.tx, p[1] - at.tz);
     const mh = env.minHalf || 0;
-    if (mh) rel.push([mh, 0, 0], [-mh, 0, 0], [0, 0, mh], [0, 0, -mh]);
-    return fitDistance(rel, { ...basis, tanH: env.tanH, tanV: env.tanV, margin: 1.12 * marginScale, min: 0.05 });
+    if (mh) { fit(mh, 0); fit(-mh, 0); fit(0, mh); fit(0, -mh); }
+    return need;
   }
 }

@@ -71,3 +71,13 @@ test('a real curated sky reaches stripping, moon formation and swallowing with c
     for (const b of [...event.before, ...event.after]) for (const key of ['x', 'y', 'm', 'vx', 'vy']) assert.ok(Number.isFinite(b[key]), `${event.type}.${key}`);
   }
 });
+
+test('a cloned system keeps every body’s metadata, so undo restores a real system with its names and brightness', () => {
+  const system = new System([body(0, 1, 0, 0, 0, 0, { meta: { name: 'Sun', lum: 1 } }), body(3, 3e-6, 1, 0, 0, 1, { kind: 'planet', meta: { name: 'Earth', follow: true } })]);
+  const copy = system.clone();
+  for (let i = 0; i < 20; i++) copy.step();
+  const out = copy.bodies();
+  assert.equal(out.map(b => b.meta && b.meta.name).join(), 'Sun,Earth');
+  assert.equal(system.meta.length, copy.meta.length);
+  assert.notEqual(system.meta, copy.meta, 'the copy owns its own list, so a later merge in one leaves the other intact');
+});
