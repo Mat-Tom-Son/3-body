@@ -34,6 +34,7 @@ function harness(rate = 6) {
   };
   c.advance = target => { c.advanceCalls++; return c.world.t + (target - c.world.t) * c.completion; };
   c.dramaTarget = () => c.drama.cur;
+  c.directorTick = () => {};
   c.eventEffects = {
     update: (dt, options) => c.effectUpdates.push({ dt, ...options }),
     reset: () => c.effectResets++,
