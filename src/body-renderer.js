@@ -151,9 +151,12 @@
     }
     return (name, frame) => {
       pixels.data.fill(0);
-      const phase = frame / FRAME_COUNT, star = name === 'star', moon = name === 'moon', scarred = name === 'scar';
-      const map = maps[star ? 'star' : moon ? 'moon' : 'planet'];
-      const palette = !star && !moon && !scarred ? PALETTES[Number(name.slice(-1))] : null;
+      /* a named map (asset set v5): 'gray:' maps are star photospheres, normalised like the Sun's; 'color:' maps keep
+       * their own colours, shaded toward the limb, and the caller's climate disc shows through them */
+      const custom = name.startsWith('gray:') || name.startsWith('color:'), truecolor = name.startsWith('color:');
+      const phase = frame / FRAME_COUNT, star = name === 'star' || name.startsWith('gray:'), moon = name === 'moon', scarred = name === 'scar';
+      const map = custom ? maps[name] : maps[star ? 'star' : moon ? 'moon' : 'planet'];
+      const palette = !star && !moon && !scarred && !truecolor ? PALETTES[Number(name.slice(-1))] : null;
       let starMean = 0, starWeight = 0;
       for (const g of geometry) {
         const u = ((g.u + phase) % 1 + 1) % 1, p = g.p;
@@ -177,6 +180,9 @@
           const value = clamp(212 + (luma - map.mean) * map.gain + activity, 116, 255) * (.70 + .30 * Math.sqrt(g.z));
           pixels.data[p] = pixels.data[p + 1] = pixels.data[p + 2] = value;
           starMean += value * g.alpha; starWeight += g.alpha;
+        } else if (truecolor) {
+          const shade = .70 + .30 * g.z;
+          for (let c = 0; c < 3; c++) pixels.data[p + c] = clamp(surface[c] * shade, 0, 255);
         } else if (moon) {
           const value = clamp(102 + (luma - 110) * .78, 55, 200) * (.72 + .28 * g.z);
           pixels.data[p] = value * 1.03; pixels.data[p + 1] = value * 1.015; pixels.data[p + 2] = value;
@@ -250,6 +256,34 @@
     });
   }
 
+  /* Named maps load and bake on first use, in the same short slices, so a system pays only for the maps its bodies wear;
+   * until a map is ready its body is drawn as before. */
+  const custom = Object.create(null);
+  function customAtlas(kind, name) {
+    const key = kind + ':' + name;
+    if (custom[key] === 'ready') return key;
+    if (custom[key]) return null;
+    custom[key] = 'loading';
+    const image = new Image(); image.decoding = 'async';
+    image.onload = () => {
+      let map;
+      try { map = readMap(image, kind === 'gray'); } catch (error) { failures.push(key + ': ' + error.message); return; }
+      atlases[key] = canvas(ATLAS_COLUMNS * FRAME_SIZE, FRAME_COUNT / ATLAS_COLUMNS * FRAME_SIZE);
+      const bake = createAtlasBuilder({ [key]: map });
+      let frame = 0;
+      const step = () => {
+        const started = performance.now();
+        try { do bake(key, frame++); while (frame < FRAME_COUNT && performance.now() - started < 4); }
+        catch (error) { failures.push(key + ': ' + error.message); return; }
+        if (frame < FRAME_COUNT) requestAnimationFrame(step); else custom[key] = 'ready';
+      };
+      requestAnimationFrame(step);
+    };
+    image.onerror = () => { failures.push(key + ': image unavailable'); };
+    image.src = new URL(name + '.webp', assetRoot).href;
+    return null;
+  }
+
   function atlasFrame(context, atlas, frame, x, y, size) {
     context.drawImage(atlas, frame % ATLAS_COLUMNS * FRAME_SIZE, Math.floor(frame / ATLAS_COLUMNS) * FRAME_SIZE,
       FRAME_SIZE, FRAME_SIZE, x, y, size, size);
@@ -289,11 +323,12 @@
 
   function starSurface(spec) {
     if (!rotationReady.star) return images['star-' + spec.id];
-    const phase = rotationPhase(spec, spec.id), cache = layer('star:' + spec.id), key = String(phase);
+    const atlas = (spec.map && spec.map !== 'star-surface' && customAtlas('gray', spec.map)) || 'star';
+    const phase = rotationPhase(spec, spec.id), cache = layer('star:' + spec.id + ':' + atlas), key = String(phase);
     if (cache.key === key) return cache.canvas;
     cache.key = key;
     const g = cache.context; g.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
-    drawWeightedFrames(g, 'star', phase, 1, true);
+    drawWeightedFrames(g, atlas, phase, 1, true);
     g.globalAlpha = 1; g.globalCompositeOperation = 'multiply';
     // Tint within the sphere only; source-atop restores its antialiased edge.
     g.save(); g.beginPath(); g.arc(FRAME_SIZE / 2, FRAME_SIZE / 2, FRAME_SIZE / 2 - .1, 0, TAU); g.clip();
@@ -301,7 +336,7 @@
     g.restore();
     g.globalCompositeOperation = 'destination-in';
     const mask = layer('star-mask');
-    if (mask.key !== key) { mask.context.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE); drawWeightedFrames(mask.context, 'star', phase, 1, true); mask.key = key; }
+    if (mask.key !== key + atlas) { mask.context.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE); drawWeightedFrames(mask.context, atlas, phase, 1, true); mask.key = key + atlas; }
     g.drawImage(mask.canvas, 0, 0); g.globalCompositeOperation = 'source-over';
     return cache.canvas;
   }
@@ -357,6 +392,17 @@
   function worldSurface(spec) {
     const moon = !!spec.moon, type = moon ? 'moon' : 'planet';
     if (!rotationReady[type]) return staticWorldSurface(spec.climate, moon, !!spec.ripped);
+    const named = spec.map && spec.map !== 'planet-surface' && spec.map !== 'moon-surface' ? customAtlas('color', spec.map) : null;
+    if (named) {                            // a named map turns as it is; the climate disc beneath tints it
+      const phase = rotationPhase(spec, type), cache = layer(type + ':' + String(spec.bodyId ?? type)), key = named + ':' + phase + ':' + !!spec.ripped;
+      if (cache.key === key) return cache.canvas;
+      cache.key = key;
+      const g = cache.context; g.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE);
+      drawWeightedFrames(g, named, phase, 1, true);
+      if (spec.ripped && atlases.scar) { const mark = layer('scar'); if (mark.key !== String(phase)) { mark.context.clearRect(0, 0, FRAME_SIZE, FRAME_SIZE); drawWeightedFrames(mark.context, 'scar', phase, 1, true); mark.key = String(phase); } g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.drawImage(mark.canvas, 0, 0); }
+      g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+      return cache.canvas;
+    }
     const phase = rotationPhase(spec, type), climate = clamp(finite(spec.climate, 2), 0, 4);
     const cache = layer(type + ':' + String(spec.bodyId ?? type));
     const key = phase + ':' + climate + ':' + !!spec.ripped;

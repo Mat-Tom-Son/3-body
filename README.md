@@ -12,12 +12,22 @@ The preset menu is grouped by how many suns a world lives under. Every system be
 | One sun | TRAPPIST-1 | e | Seven tidally locked worlds in 1.5 to 19 day orbits round an ultracool dwarf |
 | One sun | Proxima Centauri | b | The nearest star's Earth-mass world, 11 days round a flaring red dwarf |
 | One sun | Kepler-442 | b | A rocky world in the warm zone, far enough out to keep a day and night |
+| One sun | TOI-700 | d | Four TESS worlds round a quiet red dwarf; d gets 86% of Earth's light (masses from radii) |
+| One sun | Teegarden's Star | b | 108% of Earth's light from a star a tenth of the Sun's mass, in under five days |
 | Two suns | Alpha Centauri | a placed Earth-mass world 0.7 AU from B | S-type stability; A's closest pass every 80 years |
 | Two suns | Kepler-47 | c | Three real planets circling a 7-day binary; c in the habitable zone |
+| Two suns | TOI-1338 | a placed Earth-mass world 1.46 AU out | A 14.6-day pair with two real giants; no rocky world is known in any binary this close |
 | Three suns | Trisolaris | the planet | The novel's chaotic world, with seeded skies |
 | Three suns | Gliese 667 | Cc | A real three-sun sky: C warms the world, A and B are scenery 230 AU away |
+| Three suns | LTT 1445 | Ad (a candidate) | Three red dwarfs 22 light-years away; B and C circle each other every 36 years, 34 AU from A |
 
 A body may carry metadata the integrator never reads: a name and label, a sun's tone and measured brightness (used instead of the mass rule), whether a world is tidally locked (it then keeps one face to the sun that lights it, in both views), and which world the page follows. The Classics group keeps the mathematical setups (Figure-eight, Moth, Lagrange's triangle, the slingshot and the rest) unchanged. `Gliese 667` frames its near sun and worlds and leaves A and B past the edge markers, since at 230 AU they add a few millionths of the planet's warmth.
+
+### The warm zone, and going back in time
+
+**Customize → View → Warm zone** (on by default) shades the band where a world would receive 0.52 to 1.34 times Earth's sunlight, summed from every sun each frame. That is exactly the range in which the page's climate is calm (245–310 K), so a civilization lasts where the band is. Around one sun it is a ring; around a pair it stretches and wobbles, and in a chaotic three-sun sky it breaks and re-forms. The flat chart draws it from a coarse grid of the screen; the 3D view from a shader on the orbital plane.
+
+The **History** sheet has a scrubber under its timeline. Pick a moment and **Go back here**, or click any line of the chronicle to land half a year before it. The run is replayed from its start to that moment, quickly and with captions held back: the integrator and the climate advance step by step whatever the frame rate, and the chronicle records eras from the simulation alone, so the replay meets the same history and goes on to the same future. **Copy link** shares a moment as `?view=…#setup=<id>&sky=<seed>&t=<years>`; opening it replays to that moment, in orbit or on the ground.
 
 ## Run locally
 
@@ -42,6 +52,14 @@ The fourteen WebPs total **290,634 bytes**, including **110,442 bytes** for the 
 Rotation follows actual simulation progress, normalized by each preset's playback rate. At 1×, the planet turns in 24 seconds, the moon in 56 seconds, and the amber/cyan/coral stars in 48/56/64 seconds. These are presentation timings, not simulated physical spin periods. The 0.25×–8× controls scale rotation proportionally, including automatic close-pass slowdown and CPU throttling. Changing speed preserves phase. Short event accents retain their real-time durations so they remain legible at high speed.
 
 All effects pause with playback, reset with a new run or undo, and use reduced detail on slower devices. Reduced-motion preference keeps surfaces static and limits event accents. Hidden tabs stop simulation and drawing. The visuals do not change the integration method, timestep tolerance, or climate calculations.
+
+Every view also draws from asset set v5, 20 generated images in `public/assets/bodies/v5/` (1.36 MB in all, each fetched only when a body in view wears it):
+- **Worlds:** seven world maps (a second Earth-like world, ocean, desert, a tidally locked "eyeball", airless rock, lava with its glow mask), banded Jovian and Neptunian giants, and an icy moon.
+- **Stars:** grayscale red- and orange-dwarf maps, chosen by a star's mass.
+- **Ground:** seven repeating tiles (snow, grass, desert, scorched ground and its glow mask, airless regolith, cloud tops), which the climate blends between.
+- **Sky:** a Milky Way panorama for the night.
+
+`src/surfaces.js` decides which map each body wears, for the flat chart and the 3D view alike: a sun by its mass, a giant or a world wider than two Earths as banded gas, and a tidally locked world as an eyeball, bare rock or ice by whether the climate's own limits (235 and 320 K) call its light liveable; a world can name its surface with `meta.surface`. The flat chart bakes a 64-frame turning sheet for each map on first use; until a map arrives a body keeps its earlier look, and in 3D it shows plain grey rather than black. Worlds with no air get a black sky by day, with the stars out. `npm run assets:surface [masters folder]` rebuilds the WebPs from the masters (kept outside the repository, in `output/body-assets-v5/images/`) and records sizes, checksums and the generation prompts in `scripts/surface-asset-build-report.json` and `scripts/surface-asset-prompts.json`.
 
 - `Three-Body Problem.html` contains the interface and simulation.
 - `src/` contains the body rendering and event effects.

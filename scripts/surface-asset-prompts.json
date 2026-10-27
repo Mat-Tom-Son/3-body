@@ -1,0 +1,839 @@
+{
+  "tool": "Built-in image_gen; model/version and seed are not exposed by the tool",
+  "assetCount": 20,
+  "styleReferencesReviewed": [
+    "public/assets/bodies/planet-surface.webp",
+    "public/assets/bodies/moon-surface.webp",
+    "public/assets/bodies/star-surface.webp",
+    "public/assets/bodies/planet-temperate.webp"
+  ],
+  "notes": [
+    "All20 filenames in BRIEF.md delivered. The informal description said17; the named tables contain20.",
+    "Native generation resolution was1774x887 for maps and1254x1254 for ground tiles. Finished masters are explicitly resampled, not native4K detail. Native outputs are preserved in raw/.",
+    "User approved deterministic resizing, exact edge matching and pixel-aligned mask extraction. All processing stays within this output folder.",
+    "Stars and final emission masks have identical RGB channels. Masks derive from their final albedo at identical coordinates; generated AI mask candidates remain in raw/ for provenance.",
+    "The Milky Way uses the brief-accepted4096x2048 size.",
+    "Exact prompts document generation intent; stochastic generator output is not guaranteed byte-reproducible. Re-running local finishing against preserved raw sources reproduces finished pixels."
+  ],
+  "finishingScripts": [
+    "finish-planets.mjs",
+    "finish-stellar.mjs",
+    "finish-ground.mjs"
+  ],
+  "review": {
+    "allAssets": "review/contact-sheet.png",
+    "globeReadability": "review/worlds-preview.png",
+    "audit": "review/independent-audit.json"
+  },
+  "assets": {
+    "planet-eyeball.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, full-bleed 2:1 equirectangular planetary surface map. Output a 4096 x 2048 PNG, opaque RGB.\nCreate a fictional tidally locked eyeball world as a FLAT rectangular map, never a rendered globe. Quiet painterly natural material, muted teal water and sage land, creamy pale blue-white ice, subtle grey-brown pressure ridges; broad geography readable on a globe only 20–40 pixels wide.\nPrecise composition: the sun-facing point is at exact canvas centre (50% width,50% height). An irregular roughly circular open teal ocean centred exactly there spans about 35% of the entire image WIDTH in diameter. Narrow irregular shores, sage wetlands, fractured sea ice and patches of exposed land ring this ocean, transitioning smoothly into a continuous pale frozen shell everywhere else. Avoid concentric geometric rings or bullseye appearance: irregular organic coastline and broken irregular intermediate textures. The left and right image edges, representing the far side, are entirely solid ice with faint pressure ridges and match seamlessly. Top and bottom are subdued pale polar ice with no stretched streaks. The ocean circle is a geographic region inside the map, not the outline of a globe.\nFlat unlit albedo only: uniform material illumination, no directional shading, no cast shadows, no highlights, no vignette, no glow, no atmosphere rim, no sphere, no horizon, no sunlight, no stars or black space, no text, legend, grid, frame or watermark. Fill every pixel edge to edge with terrain. Seamless horizontal periodic map. Restrained contrast, nonphotographic soft painted natural detail.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-41aafc1a-f6a0-4820-9a9d-d42055b9c703.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "raw": "raw/planet-eyeball.png",
+      "processing": "Lanczos3 upscale; 6% polar mean feather; mirrored edge crossfade over 3.5% width with identical first/last columns; opaque 8-bit sRGB PNG. Eyeball only: bilinear translation centres the teal ocean core.",
+      "audit": {
+        "native": [
+          1774,
+          887
+        ],
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0,
+        "oceanCentroid": {
+          "before": [
+            2090.1158706785277,
+            995.509145048626
+          ],
+          "translationPixels": [
+            -42.6158706785277,
+            27.99085495137399
+          ],
+          "after": [
+            2047.608672657089,
+            1023.4706214966101
+          ],
+          "target": [
+            2047.5,
+            1023.5
+          ],
+          "criterion": "teal ocean core: G>R+20, B>R+15, R<65, G<145"
+        }
+      },
+      "file": "images/planet-eyeball.png",
+      "bytes": 17147577,
+      "sha256": "7acf8158211216f67beac18c9bd5de7896e628aa5117e3f063c6f30bec558174"
+    },
+    "planet-ocean.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, a full-bleed 2:1 equirectangular rectangular planetary map. Request 4096 x 2048 opaque 8-bit sRGB PNG.\nStyle: quiet painterly natural textures, restrained contrast and believable muted colour, nonphotographic, not cartoon or neon. Geography must be fictional. Use a few broad readable landforms that survive rendering on a 20–40 pixel globe, with supporting fine detail.\nTechnical constraints: flat and unlit material colour only, uniform illumination; NO globe, sphere, circular silhouette, vignette, atmosphere rim, perspective, horizon, cast shadow, directional shading, glint, glow, sun, space, labels, text, grid, frame, legend or watermark. Fill entire rectangle edge to edge. Left edge matches right edge continuously for longitude wrapping. Top and bottom are plausible subdued polar terrain, with no streaks or pinching.\nSubject: a temperate ocean world. Approximately 95% deep ocean in layered muted blue and deep teal, with one small irregular continent only a few percent of the image and a few tiny volcanic island chains. Restrained turquoise coastal shelves. Broad soft translucent pale cloud bands and two or three spiral storm systems of different sizes spread across the oceans, softly painted but still legible at thumbnail scale. The storms are atmospheric cloud colour, not shaded raised objects. Avoid familiar Earth geography. Keep polar ocean soft and low detail. Ocean area must overwhelmingly dominate.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-f64390be-b0a7-4197-b1a3-435c9bd3538e.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "raw": "raw/planet-ocean.png",
+      "processing": "Lanczos3 upscale; 6% polar mean feather; mirrored edge crossfade over 3.5% width with identical first/last columns; opaque 8-bit sRGB PNG. Eyeball only: bilinear translation centres the teal ocean core.",
+      "audit": {
+        "native": [
+          1774,
+          887
+        ],
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0
+      },
+      "file": "images/planet-ocean.png",
+      "bytes": 15118297,
+      "sha256": "b9c64330bb74c226a05ed8ff63bec85cf66582f53579bfd51caf3c664adb37ba"
+    },
+    "planet-barren.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, a full-bleed 2:1 equirectangular rectangular planetary map. Request 4096 x 2048 opaque 8-bit sRGB PNG.\nStyle: quiet painterly natural textures, restrained contrast and believable muted colour, nonphotographic, not cartoon or neon. Geography must be fictional. Use a few broad readable landforms that survive rendering on a 20–40 pixel globe, with supporting fine detail.\nTechnical constraints: flat and unlit material colour only, uniform illumination; NO globe, sphere, circular silhouette, vignette, atmosphere rim, perspective, horizon, cast shadow, directional shading, glint, glow, sun, space, labels, text, grid, frame, legend or watermark. Fill entire rectangle edge to edge. Left edge matches right edge continuously for longitude wrapping. Top and bottom are plausible subdued polar terrain, with no streaks or pinching.\nSubject: an airless rocky world, muted grey-brown basalt. Three or four broad irregular dark ancient volcanic maria amid slightly lighter weathered rocky highlands. Many impact crater rings of varied sizes, a few softly bright rayed craters, long subtle fault scarps. Geological markings are albedo mineral patterns, NOT raised shaded relief: avoid black crescent crater shadows or dramatic terrain lighting. No water, no vegetation, no clouds. A few broad crater basin landmarks must read when the sphere is tiny, while fine weathered mineral variation fills the whole surface. Top and bottom subtly different weathered polar regolith, no ice caps.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-46769833-fb08-4b14-a296-61a432ec2bd2.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "raw": "raw/planet-barren.png",
+      "processing": "Lanczos3 upscale; 6% polar mean feather; mirrored edge crossfade over 3.5% width with identical first/last columns; opaque 8-bit sRGB PNG. Eyeball only: bilinear translation centres the teal ocean core.",
+      "audit": {
+        "native": [
+          1774,
+          887
+        ],
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0
+      },
+      "file": "images/planet-barren.png",
+      "bytes": 17456959,
+      "sha256": "9f8ec38fb56ca2a7aa33f4a8501a856d7bb6d2cab516372fa17150de4574304f"
+    },
+    "planet-arid.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, a full-bleed 2:1 equirectangular rectangular planetary map. Request 4096 x 2048 opaque 8-bit sRGB PNG.\nStyle: quiet painterly natural textures, restrained contrast and believable muted colour, nonphotographic, not cartoon or neon. Geography must be fictional. Use a few broad readable landforms that survive rendering on a 20–40 pixel globe, with supporting fine detail.\nTechnical constraints: flat and unlit material colour only, uniform illumination; NO globe, sphere, circular silhouette, vignette, atmosphere rim, perspective, horizon, cast shadow, directional shading, glint, glow, sun, space, labels, text, grid, frame, legend or watermark. Fill entire rectangle edge to edge. Left edge matches right edge continuously for longitude wrapping. Top and bottom are plausible subdued polar terrain, with no streaks or pinching.\nSubject: a warm desert world. Broad asymmetrically distributed ochre, muted rust and pale buff sand dune seas, dark grey-brown rocky highlands, dry branching riverbeds, several broad irregular white salt flats, just a couple of small shrunken dark teal seas together less than 3 percent of the surface, and thin pale polar frost. Use three broad landmass/mineral-colour regions with smaller varied texture to make tiny-scale rotation legible. Gentle irregular fine sand ripples and branching weathered geology without raised relief or baked shadows. NO clouds. No green vegetation. Sand colours subdued and natural, avoid intense orange. Full 360-degree map, NOT topographic diagram.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-5c8008c4-35bd-4fc2-9c00-88a9b7e3c178.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "raw": "raw/planet-arid.png",
+      "processing": "Lanczos3 upscale; 6% polar mean feather; mirrored edge crossfade over 3.5% width with identical first/last columns; opaque 8-bit sRGB PNG. Eyeball only: bilinear translation centres the teal ocean core.",
+      "audit": {
+        "native": [
+          1774,
+          887
+        ],
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0
+      },
+      "file": "images/planet-arid.png",
+      "bytes": 19180965,
+      "sha256": "ba299a69416de26a5d65f7d271b8672de394b4dd2a255e6bcc12f709931bcd78"
+    },
+    "planet-terran-b.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, a full-bleed 2:1 equirectangular rectangular planetary map. Request 4096 x 2048 opaque 8-bit sRGB PNG.\nStyle: quiet painterly natural textures, restrained contrast and believable muted colour, nonphotographic, not cartoon or neon. Geography must be fictional. Use a few broad readable landforms that survive rendering on a 20–40 pixel globe, with supporting fine detail.\nTechnical constraints: flat and unlit material colour only, uniform illumination; NO globe, sphere, circular silhouette, vignette, atmosphere rim, perspective, horizon, cast shadow, directional shading, glint, glow, sun, space, labels, text, grid, frame, legend or watermark. Fill entire rectangle edge to edge. Left edge matches right edge continuously for longitude wrapping. Top and bottom are plausible subdued polar terrain, with no streaks or pinching.\nSubject: a second Earth-like world, fictional unfamiliar geography. One large rambling irregular SUPERCONTINENT occupying about a THIRD of the whole rectangular map, located across the central and right middle latitudes, with several narrow peninsulas and inland bays. A scatter of separate archipelagos elsewhere. Two small polar ice caps, one at top edge and one at bottom edge. Land tones: soft sage, ochre and dark forest green; deep muted TEAL oceans, restrained turquoise coastal shelves, and thin pale atmospheric cloud streaks that do not hide land silhouettes. A large continuous connected continental shape, clearly distinct from a scattered planet of many islands. Slightly dry muted natural brushwork; uniform colour illumination across entire map, not an aerial landscape photo, no mountain shading.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-860cb503-4120-4ce1-a0ce-524ae66170ca.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "raw": "raw/planet-terran-b.png",
+      "processing": "Lanczos3 upscale; 6% polar mean feather; mirrored edge crossfade over 3.5% width with identical first/last columns; opaque 8-bit sRGB PNG. Eyeball only: bilinear translation centres the teal ocean core.",
+      "audit": {
+        "native": [
+          1774,
+          887
+        ],
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0
+      },
+      "file": "images/planet-terran-b.png",
+      "bytes": 17952115,
+      "sha256": "7a55ec070bc1f837ffde4a0ffd8f862124a0a6dffbc0aeab183db736a8a5dff9"
+    },
+    "planet-lava.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, a full-bleed 2:1 equirectangular rectangular planetary map. Request 4096 x 2048 opaque 8-bit sRGB PNG.\nStyle: quiet painterly natural textures, restrained contrast and believable muted colour, nonphotographic, not cartoon or neon. Geography must be fictional. Use a few broad readable landforms that survive rendering on a 20–40 pixel globe, with supporting fine detail.\nTechnical constraints: flat and unlit material colour only, uniform illumination; NO globe, sphere, circular silhouette, vignette, atmosphere rim, perspective, horizon, cast shadow, directional shading, glint, glow, sun, space, labels, text, grid, frame, legend or watermark. Fill entire rectangle edge to edge. Left edge matches right edge continuously for longitude wrapping. Top and bottom are plausible subdued polar terrain, with no streaks or pinching.\nSubject: a molten world's ALBEDO only. Dark charcoal and almost black neutral basalt crust broken into large organic uneven plates. A fine branching network of thin cracks separates plates, connected to three or four small rounded lava lakes. For the lava material in every crack and lake use a consistent DARK muted maroon/rust mineral tint (roughly RGB70,34,28), clearly distinct in hue from the neutral grey basalt but still dark. The plates use neutral charcoal greys (around RGB35–55). Lava lakes should read as flat dark reddish areas, with no bright cores, no emission, no orange lighting, NO glow, NO bloom, no yellow or white anywhere. The matching emission mask will be separate. Keep crack structure broad enough to survive tiny globe scale but sparse—80–90% is neutral dark crust. No giant circles or single central basin. Include a little quieter polar crust with seamless wrap; no streaked poles. Fine restrained surface grain, not shiny rock or raised relief.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-b0ce62d6-3f0d-416c-818a-9590333cb479.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "raw": "raw/planet-lava.png",
+      "processing": "Lanczos3 upscale; 6% polar mean feather; mirrored edge crossfade over 3.5% width with identical first/last columns; opaque 8-bit sRGB PNG. Eyeball only: bilinear translation centres the teal ocean core.",
+      "audit": {
+        "native": [
+          1774,
+          887
+        ],
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0
+      },
+      "file": "images/planet-lava.png",
+      "bytes": 14607349,
+      "sha256": "d91f28de3f24193816bdf94ee3073457155d2bff3c667b4400a4529880032305"
+    },
+    "planet-lava-glow.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game albedo texture, a full-bleed 2:1 equirectangular rectangular planetary map. Request 4096 x 2048 opaque 8-bit sRGB PNG.\nStyle: quiet painterly natural textures, restrained contrast and believable muted colour, nonphotographic, not cartoon or neon. Geography must be fictional. Use a few broad readable landforms that survive rendering on a 20–40 pixel globe, with supporting fine detail.\nTechnical constraints: flat and unlit material colour only, uniform illumination; NO globe, sphere, circular silhouette, vignette, atmosphere rim, perspective, horizon, cast shadow, directional shading, glint, glow, sun, space, labels, text, grid, frame, legend or watermark. Fill entire rectangle edge to edge. Left edge matches right edge continuously for longitude wrapping. Top and bottom are plausible subdued polar terrain, with no streaks or pinching.\nSubject: a molten world's ALBEDO only. Dark charcoal and almost black neutral basalt crust broken into large organic uneven plates. A fine branching network of thin cracks separates plates, connected to three or four small rounded lava lakes. For the lava material in every crack and lake use a consistent DARK muted maroon/rust mineral tint (roughly RGB70,34,28), clearly distinct in hue from the neutral grey basalt but still dark. The plates use neutral charcoal greys (around RGB35–55). Lava lakes should read as flat dark reddish areas, with no bright cores, no emission, no orange lighting, NO glow, NO bloom, no yellow or white anywhere. The matching emission mask will be separate. Keep crack structure broad enough to survive tiny globe scale but sparse—80–90% is neutral dark crust. No giant circles or single central basin. Include a little quieter polar crust with seamless wrap; no streaked poles. Fine restrained surface grain, not shiny rock or raised relief.",
+      "reference": "images/planet-lava.png",
+      "seed": null,
+      "method": "Deterministic glow-mask extraction from generated and finished albedo",
+      "processing": "For each final albedo pixel: mask=round(255*smoothstep((R-max(G,B)-7)/15)); repeat value identically across RGB. No spatial offset or independent drawing.",
+      "generatedMaskCandidate": {
+        "prompt": "Use case: precise-object-edit.\nAsset type: grayscale emission mask for the EXACT supplied planetary albedo texture. The supplied image is the edit target, not a style reference. Preserve all image geometry and coordinates exactly, including every coastline of dark-maroon lava lakes, every branching maroon crack, every rock island. Do NOT redraw, move, simplify, invent or reshape features.\nConvert ONLY the dark maroon/rust material of cracks and lakes into WHITE (255). Convert neutral charcoal basalt crust to pure BLACK (0). Narrow soft antialiased grayscale falloff only at lava-crust boundaries. All three RGB channels identical, no colour, opaque 8-bit sRGB PNG. Keep the same 2:1 canvas, complete frame and pixel registration as the source. No glow blur outside cracks, no shading, no text, no labels. This is a data mask, not a beauty render. Requested output4096x2048 but exact source-coordinate alignment is critical.",
+        "reference": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/images/planet-lava.png",
+        "seed": null,
+        "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-32481655-2527-407d-a855-e8967d34c24e.png"
+      },
+      "raw": "raw/planet-lava-glow.png",
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "audit": {
+        "size": [
+          4096,
+          2048
+        ],
+        "horizontalEdgeMaxDifference": 0,
+        "maxChannelDifference": 0,
+        "whiteFraction": 0.07720363140106201,
+        "blackFraction": 0.8044488430023193,
+        "registration": "same-pixel deterministic extraction from final planet-lava.png"
+      },
+      "file": "images/planet-lava-glow.png",
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "bytes": 942979,
+      "sha256": "ea2fafc6ba72b274f8ce77d99822b84583a45bf9b9279f5cadd1d49c1d580432"
+    },
+    "giant-jovian.png": {
+      "prompt": "Use case: stylized-concept. Asset type: production planetary albedo texture, full-bleed 2:1 equirectangular map, requested 4096 × 2048 pixels, opaque 8-bit sRGB PNG. Generate one Jupiter-like gas giant surface map. Quiet natural painterly texture with restrained contrast, muted cream, tan, rust and soft brown horizontal belts and zones. Bands run exactly horizontally across the entire rectangle, with turbulent scalloped edges and finer festoons near the equator. Include one broad oval rust storm at a mid-latitude and a few smaller cream white ovals. Broad bands and the large storm must remain readable when mapped onto a globe only 20–40 pixels wide. Fill every pixel edge to edge. Seamless left-right wrap: bands and turbulence must continue continuously across the joined vertical edges. Subdued, plausible polar regions top and bottom without stretched streaks. This is a completely FLAT UNLIT rectangular ALBEDO MAP, not a picture of a globe. No sphere, circle, rim, perspective, vignette, directional shading, cast shadows, highlights, glow, sun, space background, text, labels, frame or watermark. No photographic look, no neon.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "source": "/Users/mat/.codex/generated_images/01a17dc4-656c-7a20-bce4-c3498263b5ce/exec-dcc9be3b-30af-44d1-85ea-d9fdfc6a3a07.png",
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "processing": "Node/sharp: Lanczos3 resample from 1774x887 to 4096x2048; symmetric left/right 4%-width smoothstep feather to identical border columns; 3%-height polar smoothstep convergence; opaque 8-bit RGB sRGB-profile PNG. Native AI detail was upscaled, not regenerated at final resolution.",
+      "seamValidation": "Final left and right columns are byte-identical; top and bottom rows each converge to a uniform pole colour.",
+      "rawPixelAudit": {
+        "leftRightMeanDifference": 7.673806839534009,
+        "format": "8-bit sRGB, no alpha"
+      },
+      "rawFile": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/raw/giant-jovian.png",
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "processingScript": "output/body-assets-v5/finish-stellar.mjs",
+      "finalPixelAudit": {
+        "width": 4096,
+        "height": 2048,
+        "channels": 3,
+        "depth": "uchar",
+        "space": "srgb",
+        "hasAlpha": false,
+        "exactLeftRightSeamMaxDifference": 0,
+        "topPoleMaxDifference": 0,
+        "bottomPoleMaxDifference": 0,
+        "meanLuminance": 153.42
+      },
+      "file": "images/giant-jovian.png",
+      "raw": "raw/giant-jovian.png",
+      "bytes": 13363743,
+      "sha256": "5fec6d9d47200119d02f1c13cd9dde021e8f175256e9108e608d5d7291c100c1"
+    },
+    "giant-neptunian.png": {
+      "prompt": "Use case: stylized-concept. Asset type: production planetary albedo texture, full-bleed 2:1 equirectangular map. Requested resolution 4096 × 2048 pixels, opaque 8-bit sRGB PNG. Generate one ice giant or mini-Neptune atmosphere map, quiet natural painterly and restrained, not photographic. Muted cyan to deep soft blue with gentle, low-contrast horizontal atmospheric banding. One broad dark blue oval storm at mid-latitude, a few bright but delicate white high-cirrus streaks aligned with the bands. Fewer broad features than fine details, readable on a small 20–40 pixel globe. Lower contrast than Jupiter's belts. Fill entire rectangular canvas edge to edge. Seamlessly repeat left to right: every atmospheric band continues naturally across both vertical boundaries. Soft plausible polar zones at top/bottom without stretched streaks. No sphere, globe, circle, rim, perspective, vignette, limb darkening, directional lighting, cast shadows, highlights, glow, sun, space background, labels, text, frame or watermark. This is a flat UNLIT albedo texture; the game supplies all shading. No neon cyan or electric blue.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "source": "/Users/mat/.codex/generated_images/01a17dc4-656c-7a20-bce4-c3498263b5ce/exec-0890f7be-d6db-4692-8716-27f062775f8b.png",
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "processing": "Node/sharp: Lanczos3 resample from 1774x887 to 4096x2048; symmetric left/right 4%-width smoothstep feather to identical border columns; 3%-height polar smoothstep convergence; opaque 8-bit RGB sRGB-profile PNG. Native AI detail was upscaled, not regenerated at final resolution.",
+      "seamValidation": "Final left and right columns are byte-identical; top and bottom rows each converge to a uniform pole colour.",
+      "rawPixelAudit": {
+        "leftRightMeanDifference": 3.6072904922961295,
+        "format": "8-bit sRGB, no alpha"
+      },
+      "rawFile": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/raw/giant-neptunian.png",
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "processingScript": "output/body-assets-v5/finish-stellar.mjs",
+      "finalPixelAudit": {
+        "width": 4096,
+        "height": 2048,
+        "channels": 3,
+        "depth": "uchar",
+        "space": "srgb",
+        "hasAlpha": false,
+        "exactLeftRightSeamMaxDifference": 0,
+        "topPoleMaxDifference": 0,
+        "bottomPoleMaxDifference": 0,
+        "meanLuminance": 132.96
+      },
+      "file": "images/giant-neptunian.png",
+      "raw": "raw/giant-neptunian.png",
+      "bytes": 7347814,
+      "sha256": "10f4583b062a970b70687b50fd262af6d7d0747cd727c524493fad4bc606fb4f"
+    },
+    "star-m-dwarf.png": {
+      "prompt": "Use case: stylized-concept. Asset type: production STELLAR SURFACE TEXTURE, 2:1 equirectangular rectangular map for a small rotating red dwarf, requested 4096 × 2048 pixels opaque 8-bit PNG. Grayscale only: neutral RGB grays with absolutely no red or orange tint because the game adds colour. Fill the rectangle edge to edge with a flat unlit photosphere of organic convection cells: larger and blotchier than solar granulation, fine irregular cell outlines embedded within broad gently mottled regions. Include four asymmetrically spaced broad dark gray starspot GROUPS around the two mid-latitude bands, some containing paired rounded cores and irregular soft penumbras. Distinct large spot groups should read when the whole body is only 20–40 pixels wide, without becoming black holes. Quiet painterly natural detail, restrained contrast: medium gray spot cores, mid-gray to pale-gray photosphere; no pure black or white. No gradients of lighting across the map. Continuous seamless left/right edge for spherical wrapping, subdued plausible top/bottom poles without stretched streaks. No sphere, circle outline, globe, rim, directional shading, highlights, vignette, flames, flares, glow, space background, sun icon, labels, text, frame or watermark. This is a flat surface map, not a depiction of a star in space.",
+      "reference": "public/assets/bodies/star-surface.webp (visually inspected style reference; not submitted as edit target)",
+      "seed": null,
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "source": "/Users/mat/.codex/generated_images/01a17dc4-656c-7a20-bce4-c3498263b5ce/exec-15f6af0c-dcfe-4765-9c72-8d608e71b11f.png",
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "processing": "Node/sharp: Lanczos3 resample from 1774x887 to 4096x2048; Rec.709 grayscale replicated into RGB; symmetric left/right 4%-width smoothstep feather to identical border columns; 3%-height polar smoothstep convergence; opaque 8-bit RGB sRGB-profile PNG. Native AI detail was upscaled, not regenerated at final resolution.",
+      "seamValidation": "Final left and right columns are byte-identical; top and bottom rows each converge to a uniform pole colour.",
+      "rawPixelAudit": {
+        "leftRightMeanDifference": 10.314543404735062,
+        "maxRGBChannelSpread": 6,
+        "format": "8-bit sRGB, no alpha"
+      },
+      "rawFile": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/raw/star-m-dwarf.png",
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "processingScript": "output/body-assets-v5/finish-stellar.mjs",
+      "finalPixelAudit": {
+        "width": 4096,
+        "height": 2048,
+        "channels": 3,
+        "depth": "uchar",
+        "space": "srgb",
+        "hasAlpha": false,
+        "exactLeftRightSeamMaxDifference": 0,
+        "topPoleMaxDifference": 0,
+        "bottomPoleMaxDifference": 0,
+        "grayscaleMaxChannelDifference": 0,
+        "meanLuminance": 158.61
+      },
+      "file": "images/star-m-dwarf.png",
+      "raw": "raw/star-m-dwarf.png",
+      "bytes": 5680984,
+      "sha256": "86d868e366890703b5982bea458a6feff03f74b418ae9896b3b8d9e74436ed8d"
+    },
+    "star-k-dwarf.png": {
+      "prompt": "Use case: stylized-concept. Asset type: production STELLAR SURFACE TEXTURE, flat rectangular full-bleed 2:1 equirectangular map for an orange dwarf. Requested 4096 × 2048 pixels, opaque 8-bit PNG. Neutral GRAYSCALE ONLY, no orange or warm cast; the application colours the star. Quiet painterly natural photosphere with medium-sized organic convection cells in mid-gray through pale-gray, delicate irregular cell boundaries, subtle broad mottling. Include three modest isolated spot pairs spaced asymmetrically at mid-latitudes, each pair small enough that the overall surface is calm. Spot cores dark gray, soft subtle penumbrae. Moderate cells smaller and less blotchy than an active red dwarf. Broad low-contrast variations should help motion read on a 20–40 pixel body. Texture fills every pixel. Uniform flat albedo: no directional lighting, highlights, vignette, glow or limb darkening. Seamless left-right wrapping for a sphere. Top and bottom regions remain softly stippled and near-uniform, with no horizontal smears, stretched streaks, bars or dark borders. No globe, circle, sphere outline, rim, sun icon, flames, flares, space background, labels, text, watermark or frame. Not a rocky surface; gaseous cellular granulation.",
+      "reference": "public/assets/bodies/star-surface.webp (visually inspected style reference; not submitted as edit target)",
+      "seed": null,
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "source": "/Users/mat/.codex/generated_images/01a17dc4-656c-7a20-bce4-c3498263b5ce/exec-47762a99-ea36-4b6d-89d2-253dfbb102b2.png",
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "processing": "Node/sharp: Lanczos3 resample from 1774x887 to 4096x2048; Rec.709 grayscale replicated into RGB; symmetric left/right 4%-width smoothstep feather to identical border columns; 3%-height polar smoothstep convergence; opaque 8-bit RGB sRGB-profile PNG. Native AI detail was upscaled, not regenerated at final resolution.",
+      "seamValidation": "Final left and right columns are byte-identical; top and bottom rows each converge to a uniform pole colour.",
+      "rawPixelAudit": {
+        "leftRightMeanDifference": 16.151822623074032,
+        "maxRGBChannelSpread": 4,
+        "format": "8-bit sRGB, no alpha"
+      },
+      "rawFile": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/raw/star-k-dwarf.png",
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "processingScript": "output/body-assets-v5/finish-stellar.mjs",
+      "finalPixelAudit": {
+        "width": 4096,
+        "height": 2048,
+        "channels": 3,
+        "depth": "uchar",
+        "space": "srgb",
+        "hasAlpha": false,
+        "exactLeftRightSeamMaxDifference": 0,
+        "topPoleMaxDifference": 0,
+        "bottomPoleMaxDifference": 0,
+        "grayscaleMaxChannelDifference": 0,
+        "meanLuminance": 171.2
+      },
+      "file": "images/star-k-dwarf.png",
+      "raw": "raw/star-k-dwarf.png",
+      "bytes": 5560065,
+      "sha256": "4af39595c8722e713593be69e1fb5a7cb77def1260e6a3fd48f037b57bb0313b"
+    },
+    "moon-icy.png": {
+      "prompt": "Use case: stylized-concept. Asset type: production icy-moon albedo texture, full-bleed flat 2:1 equirectangular rectangular surface map, requested 2048 × 1024 pixels opaque 8-bit sRGB PNG. White, cream and faint tan ice crust, crossed by long reddish-brown narrow crack lines (lineae) sweeping in arcs across broad regions. A few irregular smooth chaos regions made from softly jumbled ice rafts, very few small subdued craters. Restraint and believable painterly natural detail, not photographic; crack patterns and a few large chaos patches must read on a 20–40 pixel moon. No water oceans, no clouds. All relief expressed as albedo variation only: no lit/shadowed sides of cracks, no highlights or cast shadows, no directional lighting. Fill all pixels, no margins. Continuous left-right seam for sphere wrapping. Plausible soft subdued ice at top and bottom poles without stretched streaks or dark bars. Fictional surface, not a recognizable real moon map. No globe, sphere, circle, rim, vignette, glow, sun, space background, text, labels, frame or watermark. Flat evenly unlit map; renderer adds all lighting.",
+      "reference": "public/assets/bodies/moon-surface.webp (visually inspected texture style reference; not submitted as edit target)",
+      "seed": null,
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "source": "/Users/mat/.codex/generated_images/01a17dc4-656c-7a20-bce4-c3498263b5ce/exec-b34d25a3-4d5e-4b9f-a891-138933195d71.png",
+      "requestedSize": [
+        2048,
+        1024
+      ],
+      "processing": "Node/sharp: Lanczos3 resample from 1774x887 to 2048x1024; symmetric left/right 4%-width smoothstep feather to identical border columns; 3%-height polar smoothstep convergence; opaque 8-bit RGB sRGB-profile PNG. Native AI detail was upscaled, not regenerated at final resolution.",
+      "seamValidation": "Final left and right columns are byte-identical; top and bottom rows each converge to a uniform pole colour.",
+      "rawPixelAudit": {
+        "leftRightMeanDifference": 10.529500187899286,
+        "format": "8-bit sRGB, no alpha"
+      },
+      "rawFile": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/raw/moon-icy.png",
+      "finalSize": [
+        2048,
+        1024
+      ],
+      "processingScript": "output/body-assets-v5/finish-stellar.mjs",
+      "finalPixelAudit": {
+        "width": 2048,
+        "height": 1024,
+        "channels": 3,
+        "depth": "uchar",
+        "space": "srgb",
+        "hasAlpha": false,
+        "exactLeftRightSeamMaxDifference": 0,
+        "topPoleMaxDifference": 0,
+        "bottomPoleMaxDifference": 0,
+        "meanLuminance": 199.2
+      },
+      "file": "images/moon-icy.png",
+      "raw": "raw/moon-icy.png",
+      "bytes": 4276625,
+      "sha256": "c83825ad9f3991c864712344b9f8e5b99524796fd4a8f1e664c8d764c5e7c0c5"
+    },
+    "sky-milkyway.png": {
+      "prompt": "Use case: stylized-concept. Asset type: 2:1 full-sky equirectangular panorama texture for a quiet educational astronomy game, requested 4096 × 2048 pixels opaque 8-bit sRGB PNG. The galaxy seen from inside: a FAINT Milky Way band extending exactly horizontally through the middle of the entire image at 50% image height, irregular dark dust lanes through soft faint brighter star clouds. Mostly near-black deep navy-neutral space with many fine tiny scattered stars of slightly varied warmth; stars are subtle pinpoints, not exaggerated sparkling crosses. The band must have LOW brightness and gentle contrast, not a vivid astronomy poster. At most faint warm ivory and cool gray-blue tints, no saturated colored nebulae. Quiet natural painterly sky texture, broad readable galactic structure with fine restrained detail. A single continuous flat rectangular sky map, no globe or circular projection. Full bleed edge to edge and seamless left-right wrap, with star density/tone continuing across the join. Natural quiet poles at top/bottom, no vignette or black frame. No horizon, ground, landscape, mountains, trees, planets, moons, spacecraft, suns, constellation lines, labels, text, numbers, watermark or lens flare. Do not brighten the image for presentation; most pixels should stay very dark.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1774,
+        887
+      ],
+      "source": "/Users/mat/.codex/generated_images/01a17dc4-656c-7a20-bce4-c3498263b5ce/exec-76975652-60c9-41b6-9e6e-314321df7e2c.png",
+      "requestedSize": [
+        4096,
+        2048
+      ],
+      "processing": "Node/sharp: Lanczos3 resample from 1774x887 to 4096x2048; symmetric left/right 4%-width smoothstep feather to identical border columns; 1%-height polar smoothstep convergence; opaque 8-bit RGB sRGB-profile PNG. Native AI detail was upscaled, not regenerated at final resolution.",
+      "seamValidation": "Final left and right columns are byte-identical; top and bottom rows each converge to a uniform pole colour.",
+      "rawPixelAudit": {
+        "leftRightMeanDifference": 2.4381811349116873,
+        "format": "8-bit sRGB, no alpha"
+      },
+      "rawFile": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/raw/sky-milkyway.png",
+      "finalSize": [
+        4096,
+        2048
+      ],
+      "processingScript": "output/body-assets-v5/finish-stellar.mjs",
+      "finalPixelAudit": {
+        "width": 4096,
+        "height": 2048,
+        "channels": 3,
+        "depth": "uchar",
+        "space": "srgb",
+        "hasAlpha": false,
+        "exactLeftRightSeamMaxDifference": 0,
+        "topPoleMaxDifference": 0,
+        "bottomPoleMaxDifference": 0,
+        "meanLuminance": 9.58
+      },
+      "file": "images/sky-milkyway.png",
+      "raw": "raw/sky-milkyway.png",
+      "bytes": 9299772,
+      "sha256": "b26e1a0e19aa10458a6c35fb8c3e00c7292ef331d0c20c1ab847ae4a6533a2b2"
+    },
+    "ground-grassland.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground albedo texture, one square tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: Low meadow grass in varied muted greens with irregular small patches of bare earth and small stones. Quiet painterly and natural, restrained contrast, believable sage and olive greens, never neon, cartoonish or photographic.\nComposition: strictly orthographic straight down, flat full-bleed square, evenly distributed small-scale terrain. No object larger than a few percent of the tile, no dominant landmark, no strong single direction. Tile must repeat seamlessly both horizontally and vertically, matching opposite edges with continuous ground detail.\nLighting: unlit diffuse albedo only; the game adds illumination. No cast shadows, shading gradients, vignette, highlights, glow, horizon, perspective, sky, text, labels, frame, watermark or borders. Fill every pixel edge to edge with terrain. Make fine natural detail but keep broader patches subtle so repeating the tile remains unobtrusive.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "processing": {
+        "raw": "raw/ground-grassland.png",
+        "resample": "1254x1254 -> 2048x2048 with Lanczos3",
+        "seamCorrection": "Opposite pixels blended equally toward pair mean, cubic smoothstep taper over 82px (4%) each edge; horizontal then vertical. Interiors unchanged beyond edge strips.",
+        "output": "2048x2048 RGB, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 127,
+        "sha256": "fc9637d7f542dfee0a48edaa09c51c3f55c30e4b6f2591a11b9e530b0697924b"
+      },
+      "file": "images/ground-grassland.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-grassland.png",
+      "bytes": 10961770,
+      "sha256": "fc9637d7f542dfee0a48edaa09c51c3f55c30e4b6f2591a11b9e530b0697924b"
+    },
+    "ground-snow.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground albedo texture, one square tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nStyle: quiet painterly and natural, restrained contrast, believable muted palette, never neon, cartoonish or photographic.\nComposition: strictly orthographic straight down, flat full-bleed square, evenly distributed small-scale terrain. No object larger than a few percent of the tile, no dominant landmark, no strong single direction. Tile must repeat seamlessly both horizontally and vertically, matching opposite edges with continuous detail.\nLighting: unlit diffuse albedo only; the game adds illumination. No cast shadows, shading gradients, vignette, highlights, glow, horizon, perspective, sky, text, labels, frame, watermark or borders. Fill every pixel edge to edge.\nPrimary request: Wind-packed pale snow with gentle low-contrast sastrugi ripples curving in varied local directions, a little exposed muted blue ice, tiny granular ice texture. Keep the frozen ground mostly soft off-white and faint blue-grey; no mountain, trees or large rocks.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "processing": {
+        "raw": "raw/ground-snow.png",
+        "resample": "1254x1254 -> 2048x2048 with Lanczos3",
+        "seamCorrection": "Opposite pixels blended equally toward pair mean, cubic smoothstep taper over 82px (4%) each edge; horizontal then vertical. Interiors unchanged beyond edge strips.",
+        "output": "2048x2048 RGB, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 35,
+        "sha256": "02ebbd5cb5b312f6a597c3a58dcd97f3df98974b66a71a82acf3048e5a719f1d"
+      },
+      "file": "images/ground-snow.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-snow.png",
+      "bytes": 7756474,
+      "sha256": "02ebbd5cb5b312f6a597c3a58dcd97f3df98974b66a71a82acf3048e5a719f1d"
+    },
+    "ground-desert.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground albedo texture, one square seamless tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: Fine warm muted sand with gentle shallow ripples, scattered tiny gravel and a few softly edged cracked clay patches. Quiet painterly natural terrain in restrained ochre, pale sand, taupe and muted rust, low contrast, never neon, cartoonish or photographic.\nComposition: strictly orthographic straight down, flat full-bleed square. Random small-scale features, none larger than a few percent of the tile, without a dominant landmark or strong single direction. Sand ripples gently change direction between small patches. Seamlessly tileable left-to-right and top-to-bottom, opposite edges matching naturally.\nLighting: unlit diffuse albedo, uniform value balance across canvas. No cast shadows, directional shading, highlights, glow, vignette, horizon, perspective, plants, large rocks, text, labels, frame, watermark or border. Fill every pixel edge to edge.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "processing": {
+        "raw": "raw/ground-desert.png",
+        "resample": "1254x1254 -> 2048x2048 with Lanczos3",
+        "seamCorrection": "Opposite pixels blended equally toward pair mean, cubic smoothstep taper over 82px (4%) each edge; horizontal then vertical. Interiors unchanged beyond edge strips.",
+        "output": "2048x2048 RGB, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 87,
+        "sha256": "3755cbd6bb3731711892de869f2c829ad385938a22f20184218b715cb2b67336"
+      },
+      "file": "images/ground-desert.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-desert.png",
+      "bytes": 10006107,
+      "sha256": "3755cbd6bb3731711892de869f2c829ad385938a22f20184218b715cb2b67336"
+    },
+    "ground-scorched.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground ALBEDO texture, one square seamless tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: Hot scorched ground of charcoal basalt crust broken by fine branching fissures, dusty grey ash, scattered tiny basalt granules, very restrained dull rust oxidation. Deepest thin crack cores have a distinct dark muted reddish-brown pigment, slightly warmer than neutral grey rock, but remain DARK and not luminous. No molten light or embers: glow will be added by a separate mask. The cracks are narrow and naturally irregular, forming many small plates no larger than a few percent of the tile; not enormous slabs.\nStyle: quiet painterly natural terrain, low contrast dark charcoal and warm grey with dull deep rust, never neon, cartoonish or photographic.\nComposition: orthographic straight down, flat full-bleed square. Random local fissure directions, no landmark, no dominant axis. Seamlessly repeat in both horizontal and vertical directions with perfectly continuous opposite edges.\nLighting: flat unlit diffuse albedo. No cast shadows, directional shading, vignette, highlights, glow, lava colour, flames, horizon, perspective, text, labels, frame, watermark or borders. Fill the complete square edge to edge.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "processing": {
+        "raw": "raw/ground-scorched.png",
+        "resample": "1254x1254 -> 2048x2048 with Lanczos3",
+        "seamCorrection": "Opposite pixels blended equally toward pair mean, cubic smoothstep taper over 82px (4%) each edge; horizontal then vertical. Interiors unchanged beyond edge strips.",
+        "output": "2048x2048 RGB, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 67,
+        "sha256": "27deb92d52cbc7b22afbcd07dd8c2239f4252ab0b05b9283f7b3908553e5834b"
+      },
+      "file": "images/ground-scorched.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-scorched.png",
+      "bytes": 10250792,
+      "sha256": "27deb92d52cbc7b22afbcd07dd8c2239f4252ab0b05b9283f7b3908553e5834b"
+    },
+    "ground-scorched-glow.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground ALBEDO texture, one square seamless tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: Hot scorched ground of charcoal basalt crust broken by fine branching fissures, dusty grey ash, scattered tiny basalt granules, very restrained dull rust oxidation. Deepest thin crack cores have a distinct dark muted reddish-brown pigment, slightly warmer than neutral grey rock, but remain DARK and not luminous. No molten light or embers: glow will be added by a separate mask. The cracks are narrow and naturally irregular, forming many small plates no larger than a few percent of the tile; not enormous slabs.\nStyle: quiet painterly natural terrain, low contrast dark charcoal and warm grey with dull deep rust, never neon, cartoonish or photographic.\nComposition: orthographic straight down, flat full-bleed square. Random local fissure directions, no landmark, no dominant axis. Seamlessly repeat in both horizontal and vertical directions with perfectly continuous opposite edges.\nLighting: flat unlit diffuse albedo. No cast shadows, directional shading, vignette, highlights, glow, lava colour, flames, horizon, perspective, text, labels, frame, watermark or borders. Fill the complete square edge to edge.",
+      "reference": "images/ground-scorched.png",
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "notes": "Final is deterministically derived from finished albedo, not the generated draft. Exact source prompt retained here and original AI-mask prompt retained in generatedDraft.",
+      "generatedDraft": {
+        "prompt": "Use case: precise-object-edit.\nAsset type: production game emissive MASK corresponding pixel for pixel to the supplied scorched ground albedo. Preserve exact image size, crop, orientation and feature positions.\nInput image is the EDIT TARGET: convert its existing deepest brown-black cracks into a grayscale glow mask. Do not redraw or move any crack, plate, stone or edge. Every fissure must retain precisely the source geometry.\nPrimary request: Output pure neutral grayscale: white only in the deepest thin crack cores, softer grey falloff immediately along crack edges, pure black on every basalt plate, ash, pebble and all other terrain. Smooth antialiased borders, no artificial glow bloom. The bright network should be narrow and sparse. No hue.\nConstraints: one opaque PNG, requested 2048×2048 if possible without changing registration, full-bleed square. No added cracks, objects, labels, legend, text, frame, vignette, highlights or lighting. It is a texture mask, not an illustration. Preserve matching opposite edges for seamless two-axis repeat.",
+        "reference": "/Users/mat/Documents/dev/3-body/output/body-assets-v5/images/ground-scorched.png",
+        "seed": null,
+        "nativeSize": [
+          1254,
+          1254
+        ],
+        "file": "raw/ground-scorched-glow.png",
+        "note": "Preserved original AI mask draft; final uses exact-pixel extraction instead."
+      },
+      "processing": {
+        "method": "Extract from final ground-scorched albedo",
+        "expression": "min(1, smoothstep(.16,.30,(R-G)/(R+G+1)) * (1-smoothstep(45,72,.2126R+.7152G+.0722B)) * smoothstep(8,16,R-G) * 1.35)",
+        "speckleRemoval": "Discard field <= .04 and 8-connected periodic components smaller than 64 output pixels",
+        "boundary": "Periodic 3x3 [1,2,1] separable tent filter /16; duplicated edge period=2047",
+        "output": "2048x2048 RGB grayscale, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 0,
+        "sha256": "53d7f063774dc2b8d19545e4e15706099cbf24ced2eaf7469471be497a58fe22",
+        "areaAbove32": 0.0927
+      },
+      "file": "images/ground-scorched-glow.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-scorched-glow.png",
+      "bytes": 878249,
+      "sha256": "53d7f063774dc2b8d19545e4e15706099cbf24ced2eaf7469471be497a58fe22"
+    },
+    "ground-regolith.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game airless-world ground albedo texture, one square seamless tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: Quiet neutral grey dust with fine pebbles and small shallow craterlets, cool grey to faint grey-brown variations and tiny granular regolith detail. Natural restrained painterly material, not photographic or cartoonish. The craterlets are subtle circular variations in surface material, not dramatic shaded pits.\nComposition: strictly orthographic straight down, flat full-bleed square. Even distribution of many tiny details, none larger than a few percent of tile; no giant crater or focal object, no strong direction. Seamlessly tileable horizontally and vertically; opposite edges should match continuously.\nLighting: unlit diffuse albedo with no directional shadows, no highlighted crater rims, no bright side/dark side pattern, no vignette or gradient across tile. No horizon, perspective, sky, planet, text, labels, frame, border or watermark. Fill every pixel with ground texture.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "processing": {
+        "raw": "raw/ground-regolith.png",
+        "resample": "1254x1254 -> 2048x2048 with Lanczos3",
+        "seamCorrection": "Opposite pixels blended equally toward pair mean, cubic smoothstep taper over 82px (4%) each edge; horizontal then vertical. Interiors unchanged beyond edge strips.",
+        "output": "2048x2048 RGB, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 32,
+        "sha256": "7021d903ea71bd94de8cb103c0094ed94eb0f93cfa3de78cf228f1492db9b361"
+      },
+      "file": "images/ground-regolith.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-regolith.png",
+      "bytes": 10134392,
+      "sha256": "7021d903ea71bd94de8cb103c0094ed94eb0f93cfa3de78cf228f1492db9b361"
+    },
+    "ground-cloudtops.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game gas-world ground-view albedo texture, one square seamless tile, requested 2048 × 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: A sea of soft billowing cloud tops seen directly from above, white to pale neutral grey, gentle diffuse pale-grey hollows between small billows. Quiet natural painterly treatment with very restrained contrast; not a photograph, not cartoonish cotton balls. Many small loosely clustered cloud billows, each only a few percent of the tile, with no singular storm or focal feature.\nComposition: strictly orthographic overhead, full-bleed square with cloud material everywhere, no perspective or horizon and no dark sky gaps. No strong direction or repetition pattern. Tileable seamlessly in both axes: left edge joins right edge and top joins bottom with continuous billows.\nLighting: uniform ambient softness, no directional sun, no cast shadows or hard highlights, no vignette or value gradient across canvas. Only very gentle tonal hollows inherent to the cloud material. No glow, text, labels, frame, watermark or borders.",
+      "reference": null,
+      "seed": null,
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "processing": {
+        "raw": "raw/ground-cloudtops.png",
+        "resample": "1254x1254 -> 2048x2048 with Lanczos3",
+        "seamCorrection": "Opposite pixels blended equally toward pair mean, cubic smoothstep taper over 82px (4%) each edge; horizontal then vertical. Interiors unchanged beyond edge strips.",
+        "output": "2048x2048 RGB, opaque 8-bit PNG with embedded sRGB ICC profile"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 7,
+        "sha256": "3b9fbf1736dcb81be16b7ee5def026a9b67d798b605acdbc4a57cf83eb49feda"
+      },
+      "file": "images/ground-cloudtops.png",
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "raw": "raw/ground-cloudtops.png",
+      "bytes": 4348542,
+      "sha256": "3b9fbf1736dcb81be16b7ee5def026a9b67d798b605acdbc4a57cf83eb49feda"
+    }
+  }
+}

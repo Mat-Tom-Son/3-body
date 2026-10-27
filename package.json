@@ -12,7 +12,8 @@
     "test": "node --test tests/*.test.mjs",
     "check": "npm test && npm run build",
     "assets:optimize": "node scripts/optimize-assets.mjs",
-    "assets:rotation": "node scripts/optimize-rotation-assets.mjs"
+    "assets:rotation": "node scripts/optimize-rotation-assets.mjs",
+    "assets:surface": "node scripts/optimize-surface-assets.mjs"
   },
   "dependencies": { "three": "0.186.1" },
   "devDependencies": { "sharp": "0.35.4" }

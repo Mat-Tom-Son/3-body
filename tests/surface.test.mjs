@@ -123,3 +123,30 @@ test('drawn sizes keep the real order: the Sun outranks Jupiter, Jupiter Earth, 
   for (const m of [0.3, 0.7, 1.4]) near(c.radiusEarth({ m, meta: null }) * R_EARTH_AU, starRadiusAU({ m, meta: null }) , 1e-6);
   for (const mE of [0.3, 1.5, 5, 40, 300]) near(c.radiusEarth({ m: mE * M_EARTH_SUNS, kind: 'planet', meta: null }) * R_EARTH_AU, worldRadiusAU({ m: mE * M_EARTH_SUNS, meta: null }), 1e-12);
 });
+
+test('every real body wears the surface its physics calls for, the same in both views', async () => {
+  const { readFileSync } = await import('node:fs'), vm = await import('node:vm');
+  const html = readFileSync(new URL('../Three-Body Problem.html', import.meta.url), 'utf8');
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+  const ctx = vm.createContext({ window: {} }); vm.runInContext(scripts[0], ctx); vm.runInContext(scripts[1], ctx);
+  vm.runInContext(readFileSync(new URL('../src/surfaces.js', import.meta.url), 'utf8'), ctx);
+  const g = ctx.Presets ? ctx : ctx.window, { PRESETS, bodiesFor } = g.Presets, { lumOf, isStar } = g.Physics, { surfaceOf } = ctx.window.Surfaces;
+  const mapOf = (id, name) => {
+    const list = bodiesFor(PRESETS.find(p => p.id === id), false), b = list.find(q => (q.meta && q.meta.name) === name);
+    let F = 0; for (const s of list) if (s !== b && isStar(s.m)) F += lumOf(s.m, s.meta) / ((s.x - b.x) ** 2 + (s.y - b.y) ** 2);
+    const R = isStar(b.m) && b.kind !== 'planet' ? 0 : worldRadiusAU(b) / R_EARTH_AU;
+    return surfaceOf(b, F, R).name;
+  };
+  const expect = {
+    home: { 'the Sun': 'star-surface', Earth: 'planet-surface', Jupiter: 'v5/giant-jovian' },
+    trappist: { 'TRAPPIST-1': 'v5/star-m-dwarf', 'TRAPPIST-1 b': 'v5/planet-barren', 'TRAPPIST-1 e': 'v5/planet-eyeball', 'TRAPPIST-1 h': 'v5/moon-icy' },
+    proxima: { 'Proxima b': 'v5/planet-eyeball', 'Proxima d': 'v5/planet-barren' },
+    kepler442: { 'Kepler-442': 'v5/star-k-dwarf', 'Kepler-442 b': 'v5/planet-arid' },
+    alphacen: { 'Alpha Centauri A': 'star-surface', 'Alpha Centauri B': 'v5/star-k-dwarf' },
+    kepler47: { 'Kepler-47 c': 'v5/giant-neptunian', 'Kepler-47 d': 'v5/giant-jovian' },
+    gj667: { 'Gliese 667 C': 'v5/star-m-dwarf', 'Gliese 667 Cc': 'v5/planet-eyeball' },
+    ltt1445: { 'LTT 1445 Ab': 'v5/planet-barren', 'LTT 1445 Ad': 'v5/planet-eyeball' },
+    toi700: { 'TOI-700 c': 'v5/giant-neptunian', 'TOI-700 d': 'v5/planet-eyeball' },
+  };
+  for (const [id, bodies] of Object.entries(expect)) for (const [name, map] of Object.entries(bodies)) assert.equal(mapOf(id, name), map, `${id}: ${name}`);
+});

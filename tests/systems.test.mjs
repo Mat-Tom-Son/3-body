@@ -12,7 +12,7 @@ vm.runInContext(scripts[1], context);
 const { System, escaping, lumOf, isStar } = context.Physics;
 const { PRESETS, bodiesFor } = context.Presets;
 const YEAR = 2 * Math.PI;
-const REAL = { home: 10, trappist: 0.3, proxima: 1, kepler442: 10, alphacen: 50, kepler47: 3, gj667: 1 };
+const REAL = { home: 10, trappist: 0.3, proxima: 1, kepler442: 10, toi700: 2, teegarden: 0.5, alphacen: 50, kepler47: 3, toi1338: 20, gj667: 1, ltt1445: 2 };
 const byId = id => PRESETS.find(p => p.id === id);
 const followed = ic => ic.find(b => b.meta && b.meta.follow) || ic.find(b => b.kind === 'planet');
 const tempOf = (bs, p) => { let F = 0; for (const s of bs) if (s !== p && isStar(s.m)) F += lumOf(s.m, s.meta) / ((s.x - p.x) ** 2 + (s.y - p.y) ** 2); return 288 * Math.pow(F, 0.25); };
