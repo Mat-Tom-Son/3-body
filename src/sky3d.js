@@ -182,7 +182,10 @@ export function createSky3D({ canvas }) {
     const depth = tmp.clone().sub(camPos).dot(forward);
     tmp.project(camera);
     const behind = depth < 1e-4;
-    return { x: behind ? -1e6 : (tmp.x + 1) / 2 * view.w, y: behind ? -1e6 : (1 - tmp.y) / 2 * view.h, s: (view.h / 2) / (Math.max(depth, 1e-4) * tanFull), behind };
+    /* A point behind the camera projects mirrored through the centre; flip it back and push it well off screen, so the
+     * chart's edge marker still points the right way instead of to a corner. */
+    const k = behind ? -40 / Math.max(Math.abs(tmp.x), Math.abs(tmp.y), 0.05) : 1;
+    return { x: (k * tmp.x + 1) / 2 * view.w, y: (1 - k * tmp.y) / 2 * view.h, s: (view.h / 2) / (Math.max(depth, 1e-4) * tanFull), behind };
   }
   /* The point on the plane under a screen position, or null when the ray misses the plane. */
   function unproject(X, Y) {

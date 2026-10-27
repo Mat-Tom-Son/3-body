@@ -1563,9 +1563,29 @@ function orbitAbout(list, p) {
   if (!host) return null;
   const rx = p.x - host.x, ry = p.y - host.y, vx = p.vx - host.vx, vy = p.vy - host.vy, r = Math.hypot(rx, ry), mu = host.m + p.m;
   const E = 0.5 * (vx * vx + vy * vy) - mu / r;
-  if (E >= 0) return { host, bound: false, r };
+  if (E >= 0) return pairOrbit(list, p) || { host, bound: false, r };
   const a = -mu / (2 * E), h = rx * vy - ry * vx, e = Math.sqrt(Math.max(0, 1 - h * h / (mu * a)));
   return { host, bound: true, r, a, e, peri: a * (1 - e), apo: a * (1 + e) };
+}
+/* a world bound to no single sun may still circle all of them together, as Kepler-47's do: the host is then the suns'
+ * shared centre, a stand-in body (id -2) that names them */
+function pairOrbit(list, p) {
+  const stars = list.filter(s => s !== p && isStar(s.m)); if (stars.length < 2) return null;
+  let M = 0, x = 0, y = 0, vx = 0, vy = 0;
+  for (const s of stars) { M += s.m; x += s.m * s.x; y += s.m * s.y; vx += s.m * s.vx; vy += s.m * s.vy; }
+  x /= M; y /= M; vx /= M; vy /= M;
+  const rx = p.x - x, ry = p.y - y, wx = p.vx - vx, wy = p.vy - vy, r = Math.hypot(rx, ry), mu = M + p.m;
+  const E = 0.5 * (wx * wx + wy * wy) - mu / r;
+  if (E >= 0 || r < 2 * maxSeparation(stars)) return null;     // bound to the group, and far enough out for the group to pull as one
+  const named = stars.every(s => s.meta && s.meta.name);
+  let name = stars.length === 2 ? 'both suns' : 'all ' + WORDS[stars.length] + ' suns';
+  if (named) {                             // "Kepler-47 A and B" rather than "Kepler-47 A and Kepler-47 B"
+    const names = stars.map(nameOf), stem = names[0].slice(0, names[0].lastIndexOf(' ') + 1);
+    name = stem && names.every(n => n.startsWith(stem)) ? stem + names.map(n => n.slice(stem.length)).join(' and ') : names.join(' and ');
+  }
+  const host = { id: -2, parts: [], m: M, x, y, vx, vy, meta: { name } };
+  const a = -mu / (2 * E), h = rx * wy - ry * wx, e = Math.sqrt(Math.max(0, 1 - h * h / (mu * a)));
+  return { host, bound: true, pair: true, r, a, e, peri: a * (1 - e), apo: a * (1 + e) };
 }
 function watchHost(S, i) {                              // which sun holds the planet; announced only once it has held for a year
   const c = world.civ; if (c.exiled) return;
@@ -1587,7 +1607,7 @@ function eraChanged(S, i) {
   const suns = sunCount(bs);
   if (c.era === 'stable') text = 'A Stable Era begins. ' + (o && o.bound ? 'The planet circles ' + nameOf(o.host) + ' at a steady ' + AU(o.a) + (suns > 2 ? ', the other suns far off.' : suns === 2 ? ', the other sun far off.' : '.') : 'The skies have settled.');
   else {
-    const { F, shares } = fluxOn(bs, p), others = shares.filter(([q]) => !o || q !== o.host), share = others.reduce((a, [, f]) => a + f, 0) / F;
+    const { F, shares } = fluxOn(bs, p), others = shares.filter(([q]) => !o || (!o.pair && q !== o.host)), share = others.reduce((a, [, f]) => a + f, 0) / F;
     if (o && o.bound && o.e > 0.3) text = 'A Chaotic Era begins. The planet’s orbit has been stretched: it now swings from ' + AU(o.peri) + ' to ' + AU(o.apo) + ', burning and freezing in turn.';
     else if (share > 0.1) text = 'A Chaotic Era begins. ' + (suns === 2 ? 'The other sun is closing in, and its light now reaches the planet too.' : 'The other suns are closing in, and their light now reaches the planet too.');
     else text = 'A Chaotic Era begins. ' + (suns === 1 ? 'The other worlds are stirring the planet’s orbit' : 'The suns are stirring the planet’s orbit') + ', and the seasons no longer repeat.';
@@ -3020,7 +3040,7 @@ function renderScience() {
   h += fold(SCI.real[0], '<ul>'
     + '<li><strong>Real.</strong> Newton’s law of gravity, with every body pulling on every other. Close passes are not softened or fudged. Masses are in Suns, distances in AU (1 AU is the distance from the Earth to the Sun, about 150 million km), and the clock runs in years.</li>'
     + '<li><strong>Flat.</strong> Everything moves in one plane. Real systems are three-dimensional, but the mathematics and the chaos are the same.</li>'
-    + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them. When two come close on screen, their discs shrink rather than hide each other.</li>'
+    + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them. When two come close on screen, their discs shrink rather than hide each other; in 3D a sphere instead stops growing as it nears a neighbour.</li>'
     + '<li><strong>Collisions.</strong> Each star is treated as a compact ball. A 1-Sun body is about 15,000 km in radius here, roughly twice the size of a white dwarf star and nearly 50 times smaller than the real Sun. Two bodies that touch merge into one. Mass and momentum are kept, and the energy of the crash is assumed to leave as heat. There is no relativity and no loss of mass.</li>'
     + '<li><strong>Worlds.</strong> A body lighter than 0.05 Suns is a world rather than a star, and worlds meet stars at their real sizes: a planet is swallowed when it reaches a star’s true surface. Closer than about 1.5 times that, inside what astronomers call the Roche limit, a star’s tides tear a world apart. Here a tenth of it is lost as debris, which gathers into a moon once the world is far enough from the stars for the moon to hold. A world’s temperature is what it receives from every sun, with a star’s brightness rising steeply with its mass and falling with the square of distance, smoothed over about three months as oceans and air would do. The civilizations are a story told on top of the physics: one begins after a year of calm, and ends when the planet leaves the range from about −38 °C to 47 °C, or when the planet itself is torn, swallowed or thrown out.</li>'
     + '<li><strong>Real systems.</strong> The one-, two- and three-sun systems use published masses, brightnesses and orbits, cited in each system’s notes. A sun that carries a measured brightness shines by it instead of the mass rule, and a world so close to its sun that the tides have locked it keeps one face to that sun. Where no planet is known, as at Alpha Centauri, a placed world is labelled as such. Distant companions that cannot move the planet are left out or, at Gliese 667, kept 230 AU away beyond the edge of the view.</li>'
