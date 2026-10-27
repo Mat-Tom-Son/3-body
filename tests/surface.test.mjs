@@ -105,3 +105,21 @@ test('the ground’s day: a sun returns to the same place after one solar day, r
   assert.equal(solarDay(at(0), [], lum), null);
   near(solarDay({ ...at(0), meta: null }, [star], lum).days, 30, 0);
 });
+
+test('drawn sizes keep the real order: the Sun outranks Jupiter, Jupiter Earth, Earth the Moon, a red dwarf its worlds', async () => {
+  const { readFileSync } = await import('node:fs'), vm = await import('node:vm');
+  const html = readFileSync(new URL('../Three-Body Problem.html', import.meta.url), 'utf8');
+  const code = html.slice(html.indexOf('const R_EARTH_PER_SUN'), html.indexOf('/* what true size means'));
+  const c = vm.createContext({ clamp: (v, a, b) => Math.min(b, Math.max(a, v)), isStar: m => m >= 0.05, isWorld: b => b.kind === 'planet' || b.kind === 'moon', Math });
+  vm.runInContext(code + '; this.radiusEarth = radiusEarth; this.drawnRadius = drawnRadius;', c);
+  const sun = { m: 1, meta: { radius: 1 } }, jupiter = { m: 1 / 1047.35, kind: null, meta: { radius: 10.973 } };
+  const earth = { m: M_EARTH_SUNS, kind: 'planet', meta: { radius: 1 } }, moon = { m: 0.0123 * M_EARTH_SUNS, kind: 'moon', meta: null };
+  const R = b => c.drawnRadius(b);
+  assert.ok(R(sun) > R(jupiter) && R(jupiter) > R(earth) && R(earth) > R(moon), [sun, jupiter, earth, moon].map(R).join(' > '));
+  near(R(sun) / R(earth), Math.pow(109.08, 0.3), 1e-9);
+  const trappist = { m: 0.0898, meta: { radius: 0.1192 } }, g = { m: 1.321 * M_EARTH_SUNS, kind: 'planet', meta: { radius: 1.129 } };
+  assert.ok(R(trappist) > 2 * R(g), 'TRAPPIST-1 is drawn well over twice the width of its largest world');
+  /* the page's rules are the surface view's rules */
+  for (const m of [0.3, 0.7, 1.4]) near(c.radiusEarth({ m, meta: null }) * R_EARTH_AU, starRadiusAU({ m, meta: null }) , 1e-6);
+  for (const mE of [0.3, 1.5, 5, 40, 300]) near(c.radiusEarth({ m: mE * M_EARTH_SUNS, kind: 'planet', meta: null }) * R_EARTH_AU, worldRadiusAU({ m: mE * M_EARTH_SUNS, meta: null }), 1e-12);
+});

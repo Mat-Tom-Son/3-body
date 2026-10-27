@@ -276,7 +276,7 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
       const kind = kindOf(b), tone = kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind, locked = !!(b.meta && b.meta.locked);
       if (a && (a.kind !== kind || a.tone !== tone || a.locked !== locked)) { dropActor(b.id); a = null; }   // the same id is another body after a setup change
       if (!a) { a = makeActor(b, rgb); actors.set(b.id, a); }
-      const s = d && d.s ? d.s : pxPerWorld, r = (d ? d.r : 8) * SIZE_GAIN[a.kind] / s;
+      const s = d && d.s ? d.s : pxPerWorld, r = (d ? d.r : 8) * (frame.trueSize ? 1 : SIZE_GAIN[a.kind]) / s;
       a.group.position.set(b.x, 0, -b.y);
       a.mesh.scale.setScalar(r);
       a.mesh.rotation.y = spinAngle(spinTime, SPIN_PERIODS[a.tone]) + (a.kind === 'star' ? STAR_PHASE[a.tone] : 0);

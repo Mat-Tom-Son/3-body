@@ -579,6 +579,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
           <button type="button" role="radio" data-v="long" aria-checked="false" tabindex="-1">Long</button>
         </div>
       </div>
+      <button class="switch-row" type="button" role="switch" data-view="trueSize" aria-checked="false"><span>True sizes</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="labels" aria-checked="false"><span>Body labels</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="arrows" aria-checked="false"><span>Velocity arrows while playing</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
       <button class="switch-row" type="button" role="switch" data-view="slow" aria-checked="true"><span>Slow down for events</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
@@ -1428,7 +1429,7 @@ const ui = {
   speed: clamp(store.get('speed2', 0) | 0, 0, SPEEDS.length - 1),      // slow by default: the stories read better that way
   /* 3D is the default view. `chosen` marks a view the person picked themselves; a saved 'flat' without it is only the old
    * default written back with another setting, so it gives way to 3D. */
-  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: '3d', drift: true, chosen: false }, store.get('view', {})),
+  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: '3d', drift: true, chosen: false, trueSize: false }, store.get('view', {})),
   tab: 'bodies',
   sheet: null,
 };
@@ -2442,12 +2443,31 @@ function updateCamera(dt) {
 const shrink = {};
 let gain3d = 1;                           // eased 3D close-up growth, so a camera cut or clamp never makes every body jump in size
 const drawn = new Map();                 // id -> {x, y, r} in screen space, for hit-testing and labels
-function nominalR(m) { return clamp(3.4 + 1.25 * (Math.log10(Math.max(m, 1e-7)) + 6) + 2.4 * Math.cbrt(m), 3.4, 21); }
-function bodyR(b) {                      // worlds are drawn small and never glow, so they read as worlds beside the stars
-  if (b.kind === 'planet') return clamp(nominalR(b.m) + 2.6, 6.5, 9);
-  if (b.kind === 'moon') return clamp(nominalR(b.m) + 0.8, 4, 6);
-  return nominalR(b.m);
+/* Sizes. A body's physical radius, in Earth radii: the published one where it has one (meta.radius: suns in solar radii,
+ * worlds in Earth radii), otherwise Chen & Kipping's (2017) mass–radius rules. The same rules as src/surface-model.js. */
+const R_EARTH_PER_SUN = 109.08, R_EARTH_AU = 4.26352e-5, M_EARTH_IN_SUNS = 1 / 332946.05;
+function radiusEarth(b) {
+  const r = b.meta && b.meta.radius != null ? b.meta.radius : null;
+  if (isStar(b.m) && !isWorld(b)) return (r != null ? r : 0.96 * Math.pow(Math.max(b.m, 0.01), 0.88)) * R_EARTH_PER_SUN;
+  if (r != null) return r;
+  const mE = Math.max(b.m / M_EARTH_IN_SUNS, 1e-4);
+  return mE < 2.04 ? 1.008 * Math.pow(mE, 0.279) : Math.min(10.97, 1.008 * Math.pow(2.04, 0.279) * Math.pow(mE / 2.04, 0.589));
 }
+/* Drawn radius in pixels. True to scale every body would be a speck (the Sun is 0.005 AU across at 1 AU), so sizes are
+ * compressed to the 0.3 power of the real radius: the order and the rough proportions survive (the Sun is drawn four
+ * times as wide as Earth, Jupiter twice), and a world is never drawn larger than a sun larger than it. */
+const drawnRadius = b => clamp(4.5 * Math.pow(radiusEarth(b), 0.3), 2.5, 30);
+const trueRadiusAU = b => radiusEarth(b) * R_EARTH_AU;
+/* what true size means here and now, in pixels, for the world the page follows and the sun that lights it */
+function sayTrueSize() {
+  const w = world.civ && bodyById(world.cur, world.civ.id), suns = world.cur.filter(b => isStar(b.m) && !isWorld(b));
+  const sun = w && suns.length ? suns.reduce((a, q) => (Math.hypot(q.x - w.x, q.y - w.y) < Math.hypot(a.x - w.x, a.y - w.y) ? q : a)) : suns[0];
+  const px = b => { const d = 2 * trueRadiusAU(b) * scaleNow(); return d >= 10 ? Math.round(d) + ' pixels' : d >= 0.95 ? trimZeros(d.toFixed(1)) + ' pixels' : '1/' + group(Math.round(1 / d)) + ' of a pixel'; };
+  const parts = [sun && nameOf(sun) + ' is ' + px(sun) + ' across here', w && nameOf(w) + ' ' + px(w)].filter(Boolean);
+  if (ui.view.trueSize) say('trueSize', 'True sizes: ' + parts.join(', and ') + '. Space is that empty; zoom in to find them.', true, { now: true });
+  else say('trueSize', 'Bodies are drawn larger than life again, in their real order of size: a sun outranks its worlds, a giant its rocky neighbours.', true, { now: true });
+}
+function bodyR(b) { return ui.view.trueSize ? Math.max(1.2, trueRadiusAU(b) * scaleNow()) : drawnRadius(b); }
 const inkA = a => rgba(theme.ink, a);
 
 function drawGrid() {
@@ -2535,7 +2555,7 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
   drawn.clear();
   const b = world.cur, n = b.length, k = reducedMotion ? 1 : 1 - Math.exp(-dt * 14);
   /* In 3D a close look should show more of a body: sizes grow gently past the scale at which the whole setup fills the view. */
-  const gainWant = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.S0 / view.h, 0.6), 1, 10) : 1;
+  const gainWant = sky3d.on && !ui.view.trueSize ? clamp(Math.pow(scaleNow() * 2.6 * world.S0 / view.h, 0.6), 1, 10) : 1;
   gain3d += (gainWant - gain3d) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3));
   const gain = gain3d;
   const P = layoutBodies.pts || (layoutBodies.pts = []);
@@ -2545,7 +2565,7 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
     else { q.x = sx(b[i].x); q.y = sy(b[i].y); q.s = 0; q.behind = false; }
   }
   for (let i = 0; i < n; i++) {
-    const X = P[i].x, Y = P[i].y, S = P[i].s, Ri = bodyR(b[i]), R = Ri * gain;
+    const X = P[i].x, Y = P[i].y, S = P[i].s, Ri = ui.view.trueSize && S ? Math.max(1.2, trueRadiusAU(b[i]) * S) : bodyR(b[i]), R = Ri * gain;
     let f = 1, nx = 0, ny = 0, best = Infinity, nearW = Infinity, nearR = 0;
     for (let j = 0; j < n; j++) if (j !== i) {
       const dx = P[j].x - X, dy = P[j].y - Y, d = Math.hypot(dx, dy);
@@ -2558,14 +2578,18 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
      * Close up, a body grows past its flat size no further than an eighth of that distance, so close pairs and moons
      * stay apart and nothing outgrows the orbit it traces. */
     if (sky3d.on) {
-      if (n > 1) { const sep = nearW * (S || scaleNow()), floor = Ri * clamp(0.46 * sep / (Ri + nearR), 0.3, 1); f = clamp(Math.max(floor, 0.12 * sep) / R, 0, 1); }
+      /* the growth allowance is shared between the pair in proportion to their sizes, so a close-up keeps the Sun
+       * larger than its planet instead of letting both grow to the same cap */
+      if (ui.view.trueSize) f = 1;
+      else if (n > 1) { const sep = nearW * (S || scaleNow()), floor = Ri * clamp(0.46 * sep / (Ri + nearR), 0.3, 1); f = clamp(Math.max(floor, 0.24 * sep * Ri / (Ri + nearR)) / R, 0, 1); }
       else f = 1;
     }
     const id = b[i].id;
+    if (ui.view.trueSize && !sky3d.on) f = 1;   // true sizes never overlap: no shrinking
     if (shrink[id] === undefined) shrink[id] = 1;
     shrink[id] += (f - shrink[id]) * k;
     const r = Math.max(1.7, R * shrink[id]);   // vr: the radius as seen, since a sphere is drawn a little larger than a disc
-    drawn.set(id, { x: X, y: Y, r, vr: sky3d.on ? r * sky3d.api.sizeGain(b[i]) : r, R, nx, ny, nd: best, s: S, behind: P[i].behind });
+    drawn.set(id, { x: X, y: Y, r, vr: sky3d.on && !ui.view.trueSize ? r * sky3d.api.sizeGain(b[i]) : r, R, nx, ny, nd: best, s: S, behind: P[i].behind });
   }
 }
 /* A tidally locked world keeps one face to the sun that holds it: its surface phase follows the direction to that sun
@@ -2822,7 +2846,7 @@ function render(now, dt) {
       const deg = Math.round(sky3d.api.rig.cur.theta * 180 / Math.PI);
       if (deg !== view.compassDeg) { view.compassDeg = deg; dom.compassIc.style.transform = 'rotate(' + deg + 'deg)'; }
     }
-    sky3d.api.render({ bodies: world.cur, drawn, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
+    sky3d.api.render({ bodies: world.cur, drawn, trueSize: !!ui.view.trueSize, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
       climates: visuals.climates, spinTime: visuals.spinTime, quality: perf.quality, colorOf: b => colorOf(b) });
     if (standing) { drawGround(); return; }  // from the ground the chart's furniture means nothing: a compass and the sky's names instead
     if (paused && ui.view.forecast) drawForecast();
@@ -2902,7 +2926,7 @@ function drawThumb(cv, p) {
   k.globalCompositeOperation = theme.additive ? 'lighter' : 'source-over';
   d.paths.forEach((q, i) => { const b = d.start[i]; k.strokeStyle = rgba(colorOf(b, d.start), isWorld(b) ? 0.7 : 0.9); k.lineWidth = isWorld(b) ? 1 : 1.5; k.beginPath(); k.moveTo(X(q[0]), Y(q[1])); for (let j = 2; j < q.length; j += 2) k.lineTo(X(q[j]), Y(q[j + 1])); k.stroke(); });
   k.globalCompositeOperation = 'source-over';
-  d.start.forEach(q => { k.fillStyle = rgba(colorOf(q, d.start), 1); k.beginPath(); k.arc(X(q.x), Y(q.y), clamp(bodyR(q) * 0.36, 1.8, 5), 0, 2 * Math.PI); k.fill(); });
+  d.start.forEach(q => { k.fillStyle = rgba(colorOf(q, d.start), 1); k.beginPath(); k.arc(X(q.x), Y(q.y), clamp(drawnRadius(q) * 0.3, 1.6, 6), 0, 2 * Math.PI); k.fill(); });
 }
 
 /* ------------------------------------------------------------------ chrome */
@@ -3310,7 +3334,7 @@ function renderScience() {
   h += fold(SCI.real[0], '<ul>'
     + '<li><strong>Real.</strong> Newton’s law of gravity, with every body pulling on every other. Close passes are not softened or fudged. Masses are in Suns, distances in AU (1 AU is the distance from the Earth to the Sun, about 150 million km), and the clock runs in years.</li>'
     + '<li><strong>Flat.</strong> Everything moves in one plane. Real systems are three-dimensional, but the mathematics and the chaos are the same.</li>'
-    + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them. When two come close on screen, their discs shrink rather than hide each other; in 3D a sphere instead stops growing as it nears a neighbour.</li>'
+    + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them, but in their real order and rough proportion: each size is the real radius (published, or from the mass) compressed to its 0.3 power, so the Sun is drawn four times as wide as Earth rather than 109. <em>True sizes</em> in Customize shows the real thing. When two come close on screen, their discs shrink rather than hide each other; in 3D a sphere instead stops growing as it nears a neighbour, each taking a share of the gap in proportion to its size.</li>'
     + '<li><strong>On the surface.</strong> Standing on a world, the sky is computed from the simulation: each sun’s direction, its brightness, and its real width from its published radius (or, where none is measured, from its mass). Bodies too small to see are drawn as points. The observer stands at 30° north. Earth keeps its own day; a world whose spin is not known is given a day a thirtieth of its year, and a tidally locked world has no day, so its sun stands still. While you stand on a world, time slows so that a day lasts about eight seconds at 1×. The air and the ground are drawn to match the climate, not computed.</li>'
     + '<li><strong>Collisions.</strong> Each star is treated as a compact ball. A 1-Sun body is about 15,000 km in radius here, roughly twice the size of a white dwarf star and nearly 50 times smaller than the real Sun. Two bodies that touch merge into one. Mass and momentum are kept, and the energy of the crash is assumed to leave as heat. There is no relativity and no loss of mass.</li>'
     + '<li><strong>Worlds.</strong> A body lighter than 0.05 Suns is a world rather than a star, and worlds meet stars at their real sizes: a planet is swallowed when it reaches a star’s true surface. Closer than about 1.5 times that, inside what astronomers call the Roche limit, a star’s tides tear a world apart. Here a tenth of it is lost as debris, which gathers into a moon once the world is far enough from the stars for the moon to hold. A world’s temperature is what it receives from every sun, with a star’s brightness rising steeply with its mass and falling with the square of distance, smoothed over about three months as oceans and air would do. The civilizations are a story told on top of the physics: one begins after a year of calm, and ends when the planet leaves the range from about −38 °C to 47 °C, or when the planet itself is torn, swallowed or thrown out.</li>'
@@ -3551,6 +3575,7 @@ function wire() {
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.view; ui.view[k] = !ui.view[k]; store.set('view', ui.view); refreshViewPane(); invalidate();
     if (k === 'drift' && sky3d.api) sky3d.api.rig.drift = !!ui.view.drift;
+    if (k === 'trueSize') { markLayout(); sayTrueSize(); }
     if (k === 'com' && ui.view.com) say('com', 'The cross marks the center of mass, the balance point of the whole group. Nothing the bodies do to one another can move it off its straight path.', true, { now: true });
   }));
   [dom.trailSeg, dom.appearanceSeg, dom.modeSeg, dom.cameraSeg, dom.angleSeg].forEach(seg => seg.addEventListener('keydown', e => {
