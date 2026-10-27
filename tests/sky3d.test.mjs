@@ -18,7 +18,8 @@ test('the main page loads the 3D module on demand through an import map, and kee
   assert.match(html, /id="sky3d" aria-hidden="true" hidden/);
   assert.match(html, /id="modeSeg"[\s\S]*data-v="flat"[\s\S]*data-v="3d"/);
   assert.match(html, /mode: 'flat', drift: true/, 'the flat chart stays the default');
-  assert.match(html, /if \(sky3d\.on\) f = n > 1 \? clamp\(Math\.max\(bodyR\(b\[i\]\), 0\.12 \* nearW/, 'spheres are capped by real neighbour distance, not on-screen distance, so they never pulse or outgrow their orbits');
+  assert.match(html, /const sep = nearW \* \(S \|\| scaleNow\(\)\), floor = Ri \* clamp\(0\.46 \* sep \/ \(Ri \+ nearR\), 0\.3, 1\); f = clamp\(Math\.max\(floor, 0\.12 \* sep\)/,
+    'spheres are sized by real neighbour distance, not on-screen distance, so they never pulse, never clump when seen from far off, and never outgrow their orbits');
   assert.doesNotMatch(html, /grid: ui\.view\.grid \}\)/, 'the 3D sky has no grid');
   for (const name of ['drawGrid', 'drawTrails', 'drawBodies', 'drawBodyMarks', 'drawBodyOverlays', 'fitPoints', 'setViewMode', 'followBody']) assert.match(html, new RegExp(`function ${name}\\(`), `${name} must exist`);
 });
@@ -130,4 +131,24 @@ test('tints, spin and tones follow the flat page', () => {
   for (const kind of ['planet', 'moon', 'giant', 'amber', 'cyan', 'coral']) assert.ok(Number.isFinite(SPIN_PERIODS[kind]), kind + ' must have a spin period or its sphere gets a NaN rotation and vanishes');
   for (const [kind, period] of Object.entries(SPIN_PERIODS)) assert.ok(period <= 30 && period >= 6, kind + ' turns visibly at 0.25× without blurring at 1×');
   assert.equal(toneOf(4), 'cyan');
+});
+
+test('panning shifts the target across the plane, reduced motion stops a fling, and the framing matches fitDistance', () => {
+  const rig = new CameraRig(); rig.update({ dt: 0.016, points: [[0, 0], [2, 1]], ...fit });
+  rig.shift(1.5, -0.5);
+  assert.equal(rig.mode, 'manual', 'a pan leaves overview');
+  near(rig.cur.tx, rig.goal.tx); near(rig.goal.tz, rig.cur.tz);
+  const follow = new CameraRig(); follow.setMode('follow', 3); follow.shift(5, 5);
+  assert.equal(follow.goal.tx, 0, 'a followed body keeps the centre');
+  /* the tilt foreshortens the plane, so a vertical drag covers 1/cos(phi) as much ground as a sideways one */
+  const tilt = new CameraRig(); tilt.mode = 'manual'; tilt.cur.theta = tilt.goal.theta = 0; tilt.cur.phi = tilt.goal.phi = 1;
+  tilt.pan(0, 10, 100); const vertical = Math.hypot(tilt.goal.tx, tilt.goal.tz);
+  const side = new CameraRig(); side.mode = 'manual'; side.cur.theta = side.goal.theta = 0; side.cur.phi = side.goal.phi = 1;
+  side.pan(10, 0, 100); near(vertical / Math.hypot(side.goal.tx, side.goal.tz), 1 / Math.cos(1));
+  const flung = new CameraRig(); flung.fling(2000, 0, 800);
+  const before = flung.goal.theta; flung.update({ dt: 0.016, reduced: true, ...fit });
+  assert.equal(flung.vTheta, 0); assert.equal(flung.goal.theta, before, 'no inertia under reduced motion');
+  const pts = [[0.3, -1.2], [2, 0.4], [-1, 1]], at = { theta: 0.4, phi: 0.9, tx: 0.2, tz: -0.1 }, env = { ...fit, minHalf: 0.5 };
+  const rel = pts.map(([x, z]) => [x - at.tx, 0, z - at.tz]).concat([[0.5, 0, 0], [-0.5, 0, 0], [0, 0, 0.5], [0, 0, -0.5]]);
+  near(new CameraRig().distanceFor(pts, at, env, 1), fitDistance(rel, { ...basisOf(at.theta, at.phi), tanH: fit.tanH, tanV: fit.tanV, margin: 1.12, min: 0.05 }));
 });

@@ -30,7 +30,7 @@ function harness(rate = 6) {
     sampleBodies: () => [], accountThrottle: noop, throttle: {},
     watch: noop, refreshBodies: noop, updateCamera: noop, render: noop,
     updateScaleBar: noop, updateReadouts: noop, requestAnimationFrame: noop, measure: noop,
-    store: { set: noop }, refreshSpeed: noop,
+    store: { set: noop }, refreshSpeed: noop, announce: noop, trimZeros: String,
   };
   c.advance = target => { c.advanceCalls++; return c.world.t + (target - c.world.t) * c.completion; };
   c.dramaTarget = () => c.drama.cur;
