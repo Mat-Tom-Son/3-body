@@ -2564,6 +2564,7 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
     if (sky3d.on) { const p = sky3d.api.project(b[i].x, b[i].y); q.x = p.x; q.y = p.y; q.s = p.s; q.behind = p.behind; }
     else { q.x = sx(b[i].x); q.y = sy(b[i].y); q.s = 0; q.behind = false; }
   }
+  const L = layoutBodies.rows || (layoutBodies.rows = []);
   for (let i = 0; i < n; i++) {
     const X = P[i].x, Y = P[i].y, S = P[i].s, Ri = ui.view.trueSize && S ? Math.max(1.2, trueRadiusAU(b[i]) * S) : bodyR(b[i]), R = Ri * gain;
     let f = 1, nx = 0, ny = 0, best = Infinity, nearW = Infinity, nearR = 0;
@@ -2575,15 +2576,25 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
     /* Flat discs shrink when a neighbour is close on screen. A sphere has depth, and in a tilted view that rule would
      * pulse whenever bodies merely pass one another in projection, so in 3D the same rule runs on the real distance to
      * the nearest neighbour at this depth: a crowded system seen from far off draws small spheres instead of a clump.
-     * Close up, a body grows past its flat size no further than an eighth of that distance, so close pairs and moons
-     * stay apart and nothing outgrows the orbit it traces. */
-    if (sky3d.on) {
-      /* the growth allowance is shared between the pair in proportion to their sizes, so a close-up keeps the Sun
-       * larger than its planet instead of letting both grow to the same cap */
-      if (ui.view.trueSize) f = 1;
-      else if (n > 1) { const sep = nearW * (S || scaleNow()), floor = Ri * clamp(0.46 * sep / (Ri + nearR), 0.3, 1); f = clamp(Math.max(floor, 0.24 * sep * Ri / (Ri + nearR)) / R, 0, 1); }
-      else f = 1;
+     * `cap` is how far past its own size a sphere may grow before it reaches its share of the gap (shares in proportion
+     * to size), so close pairs and moons stay apart and nothing outgrows the orbit it traces. */
+    let cap = Infinity;
+    if (sky3d.on && !ui.view.trueSize && n > 1) {
+      const sep = nearW * (S || scaleNow()), floor = Ri * clamp(0.46 * sep / (Ri + nearR), 0.3, 1);
+      cap = Math.max(floor, 0.24 * sep * Ri / (Ri + nearR)) / Ri;
     }
+    let row = L[i]; if (!row) row = L[i] = {};
+    Object.assign(row, { X, Y, S, Ri, R, f, nx, ny, best, cap, seen: !P[i].behind && X > 0 && X < view.w && Y > 0 && Y < view.h });
+  }
+  /* Close up, every sphere in view grows by the same factor, and stops when the tightest pair in view would touch: one
+   * scale for all keeps the Sun four times Earth's width and twice Jupiter's, as the flat chart draws them. A sphere
+   * still shrinks on its own when it alone is crowded. */
+  let grow = gain;
+  if (sky3d.on && !ui.view.trueSize) for (let i = 0; i < n; i++) if (L[i].seen) grow = Math.min(grow, Math.max(1, L[i].cap));
+  for (let i = 0; i < n; i++) {
+    const { X, Y, S, Ri, R, nx, ny, best, cap } = L[i];
+    let f = L[i].f;
+    if (sky3d.on) f = ui.view.trueSize ? 1 : Math.min(grow, cap) * Ri / R;
     const id = b[i].id;
     if (ui.view.trueSize && !sky3d.on) f = 1;   // true sizes never overlap: no shrinking
     if (shrink[id] === undefined) shrink[id] = 1;
@@ -3701,6 +3712,7 @@ function tick(now, dt) {                   // one frame's worth of simulation an
 /* ------------------------------------------------------------------ start */
 function init() {
   readTheme(); wire(); resize(); measure();
+  ui.view.trueSize = false;                 // true sizes are a look, not a setting: every visit starts with bodies you can see
   const askedView = new URLSearchParams(location.search).get('view');
   if (askedView === '3d' || askedView === 'flat') ui.view.mode = askedView;
   else if (askedView === 'surface') { ui.view.mode = '3d'; sky3d.wantSurface = true; }   // a link straight to the ground

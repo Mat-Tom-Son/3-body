@@ -11,7 +11,9 @@ import { DEG, LATITUDE, R_EARTH_AU, localFrame, toLocal, altAz, starRadiusAU, wo
 
 const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200, LINE_PX = 1.8;
 const LUM = b => (b.meta && b.meta.lum != null ? b.meta.lum : Math.pow(b.m, 3.5));   // a published brightness when the body carries one
-const SIZE_GAIN = { star: 1, planet: 1.3, moon: 1.25, giant: 1.15 };   // worlds are a few pixels across; a sphere needs a little more than a disc to read
+/* a sphere needs a little more than a disc to read at a few pixels across; the same for every kind, so sizes keep the
+ * proportions the page gives them */
+const SIZE_GAIN = { star: 1.15, planet: 1.15, moon: 1.15, giant: 1.15 };
 const assetRoot = new URL('../assets/bodies/', import.meta.url);
 
 export function createSky3D({ canvas, onContextLost, onContextRestored, onTextureError }) {
