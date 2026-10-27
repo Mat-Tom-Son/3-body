@@ -7,6 +7,7 @@
 <meta name="description" content="An interactive gravitational simulation of three bodies, and of a world that lives, and dies, under three suns.">
 <meta name="color-scheme" content="dark light">
 <script src="src/appearance.js"></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2714%27 fill=%27%230B1E36%27/%3E%3Ccircle cx=%2720%27 cy=%2742%27 r=%279%27 fill=%27%23FFCB52%27/%3E%3Ccircle cx=%2744%27 cy=%2744%27 r=%276%27 fill=%27%238FDCFF%27/%3E%3Ccircle cx=%2734%27 cy=%2718%27 r=%277%27 fill=%27%23FF8A6B%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -115,6 +116,8 @@ button:disabled { opacity: .38; cursor: default; }
   touch-action: none; cursor: grab;
   background: radial-gradient(120% 85% at 50% 42%, var(--field-0), var(--field-1));
 }
+#sky3d { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#sky.three { background: transparent; }
 #sky.grabbing { cursor: grabbing; }
 #sky.placing { cursor: crosshair; }
 .chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
@@ -388,6 +391,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
   </defs>
 </svg>
 
+<canvas id="sky3d" aria-hidden="true" hidden></canvas>
 <canvas id="sky" role="img" aria-label="Simulation view"></canvas>
 
 <div id="ui">
@@ -504,6 +508,31 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     </div>
 
     <div class="pane" id="pane-view" role="tabpanel" aria-labelledby="tab-view" hidden>
+      <div class="field">
+        <div class="field-head"><span id="modeLbl">View</span></div>
+        <div class="seg" role="radiogroup" aria-labelledby="modeLbl" id="modeSeg">
+          <button type="button" role="radio" data-v="flat" aria-checked="true" tabindex="0">Flat</button>
+          <button type="button" role="radio" data-v="3d" aria-checked="false" tabindex="-1">3D</button>
+        </div>
+      </div>
+      <div id="cameraFields" hidden>
+        <div class="field">
+          <div class="field-head"><span id="cameraLbl">Camera</span></div>
+          <div class="seg" role="radiogroup" aria-labelledby="cameraLbl" id="cameraSeg">
+            <button type="button" role="radio" data-v="overview" aria-checked="true" tabindex="0">Overview</button>
+            <button type="button" role="radio" data-v="follow" aria-checked="false" tabindex="-1">Follow selected</button>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-head"><span id="angleLbl">Angle</span></div>
+          <div class="seg" role="group" aria-labelledby="angleLbl" id="angleSeg">
+            <button type="button" data-v="0.06">Overhead</button>
+            <button type="button" data-v="0.95">Tilted</button>
+            <button type="button" data-v="1.38">Low</button>
+          </div>
+        </div>
+        <button class="switch-row" type="button" role="switch" data-view="drift" aria-checked="true"><span>Slow turn while playing</span><span class="switch" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span></button>
+      </div>
       <div class="field">
         <div class="field-head"><span id="appearanceLbl">Appearance</span></div>
         <div class="seg" role="radiogroup" aria-labelledby="appearanceLbl" id="appearanceSeg">
@@ -1241,7 +1270,7 @@ const restoreTrails = (m, s) => { m.clear(); for (const [id, snap] of s) trailFo
 /* ------------------------------------------------------------------ state */
 const ui = {
   speed: clamp(store.get('speed2', 0) | 0, 0, SPEEDS.length - 1),      // slow by default: the stories read better that way
-  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true }, store.get('view', {})),
+  view: Object.assign({ trails: 'short', labels: false, arrows: false, forecast: true, com: false, grid: true, slow: true, mode: 'flat', drift: true }, store.get('view', {})),
   tab: 'bodies',
   sheet: null,
 };
@@ -1266,6 +1295,50 @@ const perf = { quality: 0, ema: 1 / 60, bad: 0 };      // drawing detail steps d
 let lastEdit = { key: null, time: 0 };
 let dirtyUntil = 0;
 const invalidate = (ms) => { dirtyUntil = Math.max(dirtyUntil, performance.now() + (ms || 700)); };
+
+/* ------------------------------------------------------------------ the 3D view: loaded on demand and drawn beneath the chart, which keeps every overlay */
+const sky3d = { api: null, loading: null, on: false, failed: false };
+const proj = (x, y) => { if (sky3d.on) { const p = sky3d.api.project(x, y); return [p.x, p.y]; } return [sx(x), sy(y)]; };
+const unproj = (X, Y) => (sky3d.on ? sky3d.api.unproject(X, Y) : [wx(X), wy(Y)]);
+const scaleNow = () => (sky3d.on ? sky3d.api.pxPerWorld : cam.scale);
+function setViewMode(mode, opts) {
+  opts = opts || {};
+  mode = mode === '3d' && !sky3d.failed ? '3d' : 'flat';
+  ui.view.mode = mode; if (!opts.silent) store.set('view', ui.view);
+  if (mode === 'flat') { leaveThree(); refreshViewPane(); return; }
+  if (sky3d.api) { enterThree(); refreshViewPane(); return; }
+  refreshViewPane();
+  if (sky3d.loading) return;
+  sky3d.loading = import(new URL('src/sky3d.js', location.href).href).then(m => {
+    sky3d.api = m.createSky3D({ canvas: dom.sky3d });
+    sky3d.api.setTheme(theme); sky3d.api.rig.drift = !!ui.view.drift;
+    if (ui.view.mode === '3d') { enterThree(); refreshViewPane(); }
+  }).catch(err => {
+    console.error(err);
+    sky3d.failed = true; sky3d.loading = null; ui.view.mode = 'flat'; store.set('view', ui.view); refreshViewPane();
+    say('no3d', 'The 3D view could not start in this browser, so the flat chart stays.', true, { now: true });
+  });
+}
+function enterThree() {
+  if (sky3d.on) return;
+  sky3d.on = true; dom.sky3d.hidden = false; dom.sky.classList.add('three');
+  sky3d.api.resize(view.w, view.h, view.dpr); sky3d.api.setQuality(perf.quality);
+  sky3d.api.rig.setMode(cam.auto ? 'overview' : 'manual'); sky3d.api.rig.cutNext();
+  say('three', 'Drag to turn the view, scroll or pinch to zoom, and double-tap a body to follow it. The orbits stay in one plane; only the camera moves.', true, { now: true });
+  syncFitBtn(); markLayout(); invalidate();
+}
+function leaveThree() {
+  if (!sky3d.on) return;
+  sky3d.on = false; dom.sky3d.hidden = true; dom.sky.classList.remove('three');
+  sky3d.api.clear(); cam.cut = true; cam.inited = false; syncFitBtn(); markLayout(); invalidate();
+}
+function syncFitBtn() { dom.fitBtn.hidden = sky3d.on ? sky3d.api.rig.mode === 'overview' : cam.auto; }
+function followBody(id) {
+  if (!sky3d.on) return;
+  sky3d.api.rig.setMode('follow', id); world.sel = id; bodiesDirty = true;
+  const b = bodyById(world.cur, id); if (b) say('follow', 'Following ' + nameOf(b) + '. Press F, or double-tap empty sky, to see everything again.', true, { now: true });
+  refreshViewPane(); syncFitBtn(); invalidate();
+}
 
 /* ------------------------------------------------------------------ small physics helpers */
 function maxSeparation(b) {
@@ -1520,6 +1593,7 @@ function clearRunState() {
   world.trails.clear();
   world.escaped.clear(); world.flags = {}; world.flyMin = Infinity; world.civ = null;
   cam.cut = true; cam.vx = cam.vy = cam.vs = 0;
+  if (sky3d.api) sky3d.api.rig.settle();
   resetVisuals(); drama.until = 0; drama.factor = 1;
   insight.said.clear();
   throttle.want = throttle.got = 0; throttle.ratio = 1; throttle.on = false;
@@ -1534,7 +1608,7 @@ function resetRun(opts) {
   initCivs();
   if (!bodyById(world.cur, world.sel)) world.sel = world.cur[0].id;
   computeForecast(!!opts.quick);
-  if (opts.snap) cam.inited = false;
+  if (opts.snap) { cam.inited = false; if (sky3d.api) sky3d.api.rig.cutNext(); }
   if (!opts.keepCamera) setAuto(true);
   if (!opts.keepCaption) setCaption(baseCaption());
   refreshChrome(); refreshBodies(); invalidate();
@@ -1595,9 +1669,9 @@ function recordTrail(S, trails) {
   const n = S.n, h = S.t - S.tPrev, y = S.y, yp = S.yPrev;
   let d2max = 0;
   for (let i = 0; i < n; i++) { const dx = y[2 * i] - yp[2 * i], dy = y[2 * i + 1] - yp[2 * i + 1], d2 = dx * dx + dy * dy; if (d2 > d2max) d2max = d2; }
-  const px = Math.sqrt(d2max) * cam.scale;
+  const scale = scaleNow(), px = Math.sqrt(d2max) * scale;
   const nsub = h > 0 ? clamp(Math.ceil(px / 3), 1, 32) : 1;
-  const min = (ui.view.trails === 'long' ? 2 : 1.3) / cam.scale, min2 = min * min;
+  const min = (ui.view.trails === 'long' ? 2 : 1.3) / scale, min2 = min * min;
   const buf = bufFor(n);
   for (let s = 1; s <= nsub; s++) {
     if (s < nsub) {
@@ -1796,9 +1870,9 @@ function placeAt(x, y) {
 }
 function drawPlacing() {
   if (!place.on || !place.hover) return;
-  const spot = spotFor(place.x, place.y, world.cur), X = sx(spot.at[0]), Y = sy(spot.at[1]);
-  ctx.setLineDash([2, 6]); ctx.lineWidth = 1.3; ctx.strokeStyle = inkA(0.6); ctx.beginPath(); ctx.arc(X, Y, spot.r * cam.scale, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
-  const px = sx(place.x), py = sy(place.y), r = 7;
+  const spot = spotFor(place.x, place.y, world.cur), [X, Y] = proj(spot.at[0], spot.at[1]);
+  ctx.setLineDash([2, 6]); ctx.lineWidth = 1.3; ctx.strokeStyle = inkA(0.6); ctx.beginPath(); ctx.arc(X, Y, spot.r * scaleNow(), 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+  const [px, py] = proj(place.x, place.y), r = 7;
   ctx.fillStyle = rgba(theme.worldMild, 0.75); ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI); ctx.fill();
   ctx.strokeStyle = inkA(0.8); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(px, py, r + 0.5, 0, 2 * Math.PI); ctx.stroke();
 }
@@ -1844,7 +1918,7 @@ function computeForecast(quick) {
   const S = new System(start, quick ? 1e-10 : 1e-12);
   const horizon = world.preset.trail, maxSteps = quick ? 600 : 5000;
   const paths = new Map(); start.forEach(b => paths.set(b.id, [b.x, b.y]));
-  const min = 3.5 / cam.scale, min2 = min * min;
+  const scale = scaleNow(), min = 3.5 / scale, min2 = min * min;
   let tmp = new Float64Array(4 * S.n), merge = null;
   while (S.t < horizon && S.steps < maxSteps) {
     const nEv = S.events.length;
@@ -1853,7 +1927,7 @@ function computeForecast(quick) {
     const n = S.n, h = S.t - S.tPrev; let d2 = 0;
     if (tmp.length < 4 * n) tmp = new Float64Array(4 * n);
     for (let i = 0; i < n; i++) { const dx = S.y[2 * i] - S.yPrev[2 * i], dy = S.y[2 * i + 1] - S.yPrev[2 * i + 1]; d2 = Math.max(d2, dx * dx + dy * dy); }
-    const nsub = clamp(Math.ceil(Math.sqrt(d2) * cam.scale / 5), 1, 24);
+    const nsub = clamp(Math.ceil(Math.sqrt(d2) * scale / 5), 1, 24);
     for (let s = 1; s <= nsub; s++) {
       S.sample(S.tPrev + h * s / nsub, tmp);
       for (let i = 0; i < n; i++) {
@@ -1881,7 +1955,7 @@ const dom = {};
 ['sky', 'ui', 'presetBtn', 'presetName', 'editedPill', 'captionBtn', 'captionText', 'customBtn', 'clock', 'civOut', 'bottom', 'scale', 'scaleBar', 'scaleLbl',
   'context', 'undoBtn', 'resetBtn', 'skyBtn', 'skyPill', 'skiesSheet', 'skyGrid', 'seedForm', 'seedInput', 'planetBtn', 'eraOut', 'eraLbl', 'eraStrip', 'historySheet', 'histBody', 'histCanvas', 'histTip', 'histLegend', 'histStats', 'histLog', 'fitBtn', 'transport', 'restartBtn', 'playBtn', 'playIcon', 'slowerBtn', 'fasterBtn', 'speedOut', 'scrim',
   'presetSheet', 'presetGrid', 'customSheet', 'scienceSheet', 'sciBody', 'sheetPlay', 'sheetPlayIcon', 'sheetRestart', 'bodyChips', 'massRange', 'massVal',
-  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg'].forEach(id => { dom[id] = $(id); });
+  'xVal', 'yVal', 'vVal', 'dVal', 'dirIcon', 'trailSeg', 'appearanceSeg', 'sky3d', 'modeSeg', 'cameraSeg', 'angleSeg', 'cameraFields'].forEach(id => { dom[id] = $(id); });
 dom.topLeft = document.querySelector('.top-left'); dom.topRight = document.querySelector('.top-right');
 const ctx = dom.sky.getContext('2d');
 const motionMQ = matchMedia('(prefers-reduced-motion: reduce)');
@@ -1976,6 +2050,7 @@ function resize() {
   view.dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = Math.round(view.w * view.dpr), H = Math.round(view.h * view.dpr);
   if (dom.sky.width !== W || dom.sky.height !== H) { dom.sky.width = W; dom.sky.height = H; }
+  if (sky3d.api) sky3d.api.resize(view.w, view.h, view.dpr);
   document.body.classList.toggle('bottom-sheet', !drawerMQ.matches);
   applyInsets(); markLayout();
 }
@@ -2009,21 +2084,27 @@ const sy = y => view.cy - (y - cam.y) * cam.scale;
 const wx = px => cam.x + (px - view.cx) / cam.scale;
 const wy = py => cam.y - (py - view.cy) / cam.scale;
 function setAuto(on) {
-  cam.auto = on; cam.cut = true; cam.vx = cam.vy = cam.vs = 0; dom.fitBtn.hidden = on; markLayout();
+  cam.auto = on; cam.cut = true; cam.vx = cam.vy = cam.vs = 0;
+  if (sky3d.on) { sky3d.api.rig.setMode(on ? 'overview' : 'manual'); if (on) sky3d.api.rig.touch(); refreshViewPane(); }
+  syncFitBtn(); markLayout();
 }
-function fitTarget() {
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  const add = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
+function fitPoints() {                    // everything worth keeping in view: bodies that have not escaped, their recent trails, the path ahead
+  const pts = [];
   let tracked = world.cur.filter(b => !world.escaped.has(b.id));
   if (!tracked.length) tracked = world.cur;
   const tMin = world.t - world.preset.trail;
   for (const b of tracked) {
-    add(b.x, b.y);
+    pts.push([b.x, b.y]);
     const tr = world.trails.get(b.id);
-    if (tr) for (let k = tr.len - 1; k >= 0; k -= 2) { const i = tr.at(k); if (tr.t[i] < tMin) break; add(tr.x[i], tr.y[i]); }
+    if (tr) for (let k = tr.len - 1; k >= 0; k -= 2) { const i = tr.at(k); if (tr.t[i] < tMin) break; pts.push([tr.x[i], tr.y[i]]); }
   }
   const fb = world.frameBox;
-  if (fb && world.t <= fb.until && !world.escaped.size) { add(fb.x0, fb.y0); add(fb.x1, fb.y1); }
+  if (fb && world.t <= fb.until && !world.escaped.size) pts.push([fb.x0, fb.y0], [fb.x1, fb.y1]);
+  return pts;
+}
+function fitTarget() {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of fitPoints()) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   const s = view.safe, pad = world.playing ? 34 : 46;
   const minHalf = 0.2 * world.R0;
   const hw = Math.max((x1 - x0) / 2, minHalf), hh = Math.max((y1 - y0) / 2, minHalf);
@@ -2038,6 +2119,25 @@ function updateCamera(dt) {
   else if (!holding) {
     const k = reducedMotion ? 1 : 1 - Math.exp(-dt * 9);
     if (Math.abs(view.tcx - view.cx) + Math.abs(view.tcy - view.cy) > 0.3) { view.cx += (view.tcx - view.cx) * k; view.cy += (view.tcy - view.cy) * k; invalidate(200); }
+  }
+  if (sky3d.on) {                           // the rig frames, follows or holds; the chart's own camera waits untouched
+    cam.inited = true;
+    sky3d.api.setCenter(view.cx, view.cy);
+    const rig = sky3d.api.rig;
+    let follow = null, followDefault;
+    if (rig.mode === 'follow') {
+      const b = bodyById(world.cur, rig.followId);
+      if (!b) setAuto(true);
+      else {
+        follow = [b.x, b.y];
+        let near = Infinity; for (const q of world.cur) if (q !== b) near = Math.min(near, Math.hypot(q.x - b.x, q.y - b.y));
+        followDefault = clamp(isFinite(near) ? 2.6 * near : world.R0, 0.08 * world.R0, 1.5 * world.R0);
+      }
+    }
+    const moved = sky3d.api.updateCamera({ dt, points: rig.mode === 'overview' ? fitPoints() : null, follow, followDefault, minHalf: 0.2 * world.R0,
+      safe: view.safe, pad: world.playing ? 34 : 46, playing: world.playing && !document.hidden, reduced: reducedMotion, hold: holding });
+    if (moved) invalidate(200);
+    return;
   }
   if (!cam.auto || holding) { cam.inited = true; return; }
   const T = fitTarget();
@@ -2134,14 +2234,15 @@ function drawForecast() {
     const K = Math.min(6, Math.max(1, n >> 3));
     for (let c = 0; c < K; c++) {
       const i0 = Math.floor(c * (n - 1) / K), i1 = Math.floor((c + 1) * (n - 1) / K);
-      ctx.strokeStyle = rgba(colorById(id, fc.bodies), (0.85 * (1 - c / K) + 0.12).toFixed(3)); ctx.beginPath(); ctx.moveTo(sx(p[2 * i0]), sy(p[2 * i0 + 1]));
-      for (let j = i0 + 1; j <= i1; j++) ctx.lineTo(sx(p[2 * j]), sy(p[2 * j + 1]));
+      const [mx, my] = proj(p[2 * i0], p[2 * i0 + 1]);
+      ctx.strokeStyle = rgba(colorById(id, fc.bodies), (0.85 * (1 - c / K) + 0.12).toFixed(3)); ctx.beginPath(); ctx.moveTo(mx, my);
+      for (let j = i0 + 1; j <= i1; j++) { const [lx, ly] = proj(p[2 * j], p[2 * j + 1]); ctx.lineTo(lx, ly); }
       ctx.stroke();
     }
   });
   ctx.setLineDash([]);
   if (fc.merge) {
-    const X = sx(fc.merge.x), Y = sy(fc.merge.y);
+    const [X, Y] = proj(fc.merge.x, fc.merge.y);
     ctx.strokeStyle = inkA(0.9); ctx.lineWidth = 1.6; ctx.beginPath();
     for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; ctx.moveTo(X + 5 * Math.cos(a), Y + 5 * Math.sin(a)); ctx.lineTo(X + 10 * Math.cos(a), Y + 10 * Math.sin(a)); }
     ctx.stroke();
@@ -2149,7 +2250,7 @@ function drawForecast() {
 }
 
 function drawCOM() {
-  const c = centerOfMass(world.cur), X = sx(c[0]), Y = sy(c[1]), X0 = sx(world.com0[0]), Y0 = sy(world.com0[1]);
+  const c = centerOfMass(world.cur), [X, Y] = proj(c[0], c[1]), [X0, Y0] = proj(world.com0[0], world.com0[1]);
   ctx.strokeStyle = inkA(0.85); ctx.lineWidth = 1.4;
   if (Math.hypot(X - X0, Y - Y0) > 3) { ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(X0, Y0); ctx.lineTo(X, Y); ctx.stroke(); ctx.setLineDash([]); }
   ctx.beginPath(); ctx.arc(X, Y, 6, 0, 2 * Math.PI); ctx.moveTo(X - 10, Y); ctx.lineTo(X + 10, Y); ctx.moveTo(X, Y - 10); ctx.lineTo(X, Y + 10); ctx.stroke();
@@ -2158,17 +2259,21 @@ function drawCOM() {
 function layoutBodies(dt) {               // screen positions and drawn sizes; discs shrink rather than hide a close neighbour
   drawn.clear();
   const b = world.cur, n = b.length, k = reducedMotion ? 1 : 1 - Math.exp(-dt * 14);
+  /* In 3D a close look should show more of a body: sizes grow gently past the scale at which the whole setup fills the view. */
+  const gain = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.R0 / view.h, 0.6), 1, 10) : 1;
   for (let i = 0; i < n; i++) {
-    const X = sx(b[i].x), Y = sy(b[i].y), R = bodyR(b[i]);
+    let X, Y, S = 0;
+    if (sky3d.on) { const p = sky3d.api.project(b[i].x, b[i].y); X = p.x; Y = p.y; S = p.s; } else { X = sx(b[i].x); Y = sy(b[i].y); }
+    const R = bodyR(b[i]) * gain;
     let f = 1, nx = 0, ny = 0, best = Infinity;
     for (let j = 0; j < n; j++) if (j !== i) {
-      const dx = sx(b[j].x) - X, dy = sy(b[j].y) - Y, d = Math.hypot(dx, dy);
+      const [jx, jy] = proj(b[j].x, b[j].y), dx = jx - X, dy = jy - Y, d = Math.hypot(dx, dy);
       if (d < best) { best = d; nx = dx; ny = dy; f = clamp(0.46 * d / (R + bodyR(b[j])), 0.3, 1); }
     }
     const id = b[i].id;
     if (shrink[id] === undefined) shrink[id] = 1;
     shrink[id] += (f - shrink[id]) * k;
-    drawn.set(id, { x: X, y: Y, r: Math.max(1.7, R * shrink[id]), R, nx, ny, nd: best });
+    drawn.set(id, { x: X, y: Y, r: Math.max(1.7, R * shrink[id]), R, nx, ny, nd: best, s: S });
   }
 }
 function drawBodies(paused) {
@@ -2199,31 +2304,43 @@ function drawBodies(paused) {
       }
       ctx.strokeStyle = inkA(theme.additive ? 0.55 : 0.35); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(d.x, d.y, d.r + 0.5, 0, 2 * Math.PI); ctx.stroke();
     }
-    if (ui.view.labels) {
-      if (isWorld(q) && !paused) { /* worlds carry no letter while playing: their look is the label */ }
-      else if (d.r >= 8 && !(bodyRenderer && isStar(q.m) && !isWorld(q))) {
-        ctx.fillStyle = theme.bodyInk; ctx.font = '600 ' + Math.min(13, d.r * (lab.length > 1 ? 0.8 : 1.05)).toFixed(1) + 'px ' + theme.fontUI; ctx.fillText(lab, d.x, d.y + 0.5);
-      } else {
-        let ux = -d.nx, uy = -d.ny; const L = Math.hypot(ux, uy);
-        if (L > 0 && d.nd < 60) { ux /= L; uy /= L; } else { ux = 0.7071; uy = -0.7071; }
-        const off = d.r + 10; ctx.font = '600 12px ' + theme.fontUI;
-        ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.lineJoin = 'round';
-        ctx.strokeText(lab, d.x + ux * off, d.y + uy * off); ctx.fillStyle = rgba(col, 1); ctx.fillText(lab, d.x + ux * off, d.y + uy * off);
-      }
-    }
-    if (paused) {
-      const sel = q.id === world.sel;
-      ctx.strokeStyle = inkA(sel ? 0.95 : 0.5); ctx.lineWidth = sel ? 1.8 : 1.2;
-      if (!sel) ctx.setLineDash([3, 4]);
-      ctx.beginPath(); ctx.arc(d.x, d.y, Math.max(d.r, 5) + 6.5, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+    drawBodyMarks(q, d, col, lab, paused);
+  }
+}
+function drawBodyMarks(q, d, col, lab, paused) {   // letters and the paused selection ring: the chart and the 3D overlay share them
+  if (ui.view.labels) {
+    if (isWorld(q) && !paused) { /* worlds carry no letter while playing: their look is the label */ }
+    else if (d.r >= 8 && !sky3d.on && !(bodyRenderer && isStar(q.m) && !isWorld(q))) {
+      ctx.fillStyle = theme.bodyInk; ctx.font = '600 ' + Math.min(13, d.r * (lab.length > 1 ? 0.8 : 1.05)).toFixed(1) + 'px ' + theme.fontUI; ctx.fillText(lab, d.x, d.y + 0.5);
+    } else {
+      let ux = -d.nx, uy = -d.ny; const L = Math.hypot(ux, uy);
+      if (L > 0 && d.nd < 60) { ux /= L; uy /= L; } else { ux = 0.7071; uy = -0.7071; }
+      const off = d.r + 10; ctx.font = '600 12px ' + theme.fontUI;
+      ctx.lineWidth = 3; ctx.strokeStyle = rgba(theme.field, 0.85); ctx.lineJoin = 'round';
+      ctx.strokeText(lab, d.x + ux * off, d.y + uy * off); ctx.fillStyle = rgba(col, 1); ctx.fillText(lab, d.x + ux * off, d.y + uy * off);
     }
   }
+  if (paused) {
+    const sel = q.id === world.sel;
+    ctx.strokeStyle = inkA(sel ? 0.95 : 0.5); ctx.lineWidth = sel ? 1.8 : 1.2;
+    if (!sel) ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.arc(d.x, d.y, Math.max(d.r, 5) + 6.5, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+function drawBodyOverlays(paused) {       // in 3D the spheres are drawn beneath; only their marks go on the chart
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const q of world.cur) { const d = drawn.get(q.id); if (!d || d.x < -1e5) continue; drawBodyMarks(q, d, colorOf(q), labelOf(q), paused); }
 }
 
 const HANDLE_MIN = 36;
 function handleOf(q) {                     // where a body's velocity handle sits on screen
   const d = drawn.get(q.id); if (!d) return null;
-  const vx = q.vx * world.arrowK, vy = -q.vy * world.arrowK, len = Math.hypot(vx, vy);
+  let vx, vy;
+  if (sky3d.on) {                           // the arrow lies on the plane: project its tip, so it foreshortens with the view
+    const k = world.arrowK / (d.s || scaleNow()), p = sky3d.api.project(q.x + q.vx * k, q.y + q.vy * k);
+    vx = p.x - d.x; vy = p.y - d.y;
+  } else { vx = q.vx * world.arrowK; vy = -q.vy * world.arrowK; }
+  const len = Math.hypot(vx, vy);
   if (len < 0.75) return { x: d.x + 25.5, y: d.y - 25.5, len: 0, ux: 0.7071, uy: -0.7071, bx: d.x, by: d.y, r: d.r };
   const ux = vx / len, uy = vy / len, L = Math.max(len, HANDLE_MIN);
   return { x: d.x + ux * L, y: d.y + uy * L, len, ux, uy, bx: d.x, by: d.y, r: d.r };
@@ -2260,7 +2377,7 @@ function arrowPath(h, start, tx, ty, paused) {
 
 function drawEvents() {
   if (!eventEffects) return;
-  eventEffects.draw(ctx, { bodies: world.cur, project: b => ({ x: sx(b.x), y: sy(b.y) }),
+  eventEffects.draw(ctx, { bodies: world.cur, project: b => { const [x, y] = proj(b.x, b.y); return { x, y }; },
     radius: b => drawn.get(b.id)?.r || bodyR(b), quality: perf.quality, theme: theme.additive ? 'dark' : 'light' });
 }
 function drawEdgeMarks() {                 // a body out of view leaves a marker at the edge it left by
@@ -2297,6 +2414,18 @@ function render(now, dt) {
   ctx.clearRect(0, 0, view.w, view.h);
   const paused = !world.playing;
   layoutBodies(dt);
+  if (sky3d.on) {
+    sky3d.api.setQuality(perf.quality);
+    sky3d.api.render({ bodies: world.cur, drawn, trails: world.trails, trailMode: ui.view.trails, tNow: world.t, tMin: world.t - world.preset.trail,
+      climates: visuals.climates, spinTime: visuals.spinTime, quality: perf.quality, colorOf: b => colorOf(b), grid: ui.view.grid });
+    if (paused && ui.view.forecast) drawForecast();
+    if (ui.view.com) drawCOM();
+    drawBodyOverlays(paused);
+    drawEvents();
+    if (paused || ui.view.arrows) drawArrows(paused);
+    drawEdgeMarks(); drawDragLabel(); drawPlacing();
+    return;
+  }
   if (ui.view.grid) drawGrid();
   if (paused && ui.view.forecast) drawForecast();
   if (ui.view.trails !== 'off') drawTrails();
@@ -2310,7 +2439,7 @@ function render(now, dt) {
 /* ------------------------------------------------------------------ scale bar */
 const scaleCache = { px: -1, label: '' };
 function updateScaleBar() {
-  const maxPx = Math.min(240, view.w * 0.5), s = cam.scale;
+  const maxPx = Math.min(240, view.w * 0.5), s = scaleNow();
   let len = 1, label = 'Earth–Sun distance';
   if (s > maxPx || s < 34) {
     const target = 84 / s;
@@ -2505,6 +2634,9 @@ function refreshViewPane() {
     b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1;
   }
   for (const b of dom.trailSeg.children) b.setAttribute('aria-checked', String(b.dataset.v === ui.view.trails));
+  for (const b of dom.modeSeg.children) { const on = b.dataset.v === ui.view.mode; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }
+  dom.cameraFields.hidden = !sky3d.on;
+  if (sky3d.on) for (const b of dom.cameraSeg.children) { const on = b.dataset.v === (sky3d.api.rig.mode === 'follow' ? 'follow' : 'overview'); b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; }
   document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-checked', String(!!ui.view[b.dataset.view])));
 }
 function selectTab(name, focus) {
@@ -2798,6 +2930,7 @@ function onMove(e) {
   const px = p.x, py = p.y; p.x = e.clientX; p.y = e.clientY;
   if (drag.mode === 'pinch' && drag.pointers.size >= 2) {
     const a = drag.pinch, b = pinchState();
+    if (sky3d.on) { sky3d.api.dollyAt(a.d / Math.max(b.d, 1), b.x, b.y); sky3d.api.rig.pan(b.x - a.x, b.y - a.y, scaleNow()); drag.pinch = b; invalidate(); return; }
     const X = wx(a.x), Y = wy(a.y);
     cam.scale = clamp(cam.scale * b.d / Math.max(a.d, 1), 0.02, 2e5);
     cam.x = X - (b.x - view.cx) / cam.scale; cam.y = Y + (b.y - view.cy) / cam.scale;
@@ -2813,15 +2946,30 @@ function onMove(e) {
       if (!q) { drag.mode = 'pan'; return; }
       drag.id = q.id; world.sel = q.id;
       if (drag.hit.type === 'vel') { drag.mode = 'vel'; drag.v0x = q.vx; drag.v0y = q.vy; }
-      else { drag.mode = 'body'; drag.offx = q.x - wx(drag.sx); drag.offy = q.y - wy(drag.sy); }
-    } else { drag.mode = 'pan'; setAuto(false); }
+      else { drag.mode = 'body'; const w0 = unproj(drag.sx, drag.sy) || [q.x, q.y]; drag.offx = q.x - w0[0]; drag.offy = q.y - w0[1]; }
+      if (drag.mode === 'vel' && sky3d.on) {    // remember where on the plane the handle was grabbed, relative to the velocity it shows
+        const d = drawn.get(q.id), k = world.arrowK / ((d && d.s) || scaleNow()), w0 = unproj(drag.sx, drag.sy);
+        drag.hk = k; drag.hoffx = w0 ? (w0[0] - q.x) / k - q.vx : 0; drag.hoffy = w0 ? (w0[1] - q.y) / k - q.vy : 0;
+      }
+    } else { drag.mode = 'pan'; drag.fvx = drag.fvy = 0; drag.vt = performance.now(); if (!sky3d.on) setAuto(false); }
   }
-  if (drag.mode === 'pan') { cam.x -= (e.clientX - px) / cam.scale; cam.y += (e.clientY - py) / cam.scale; invalidate(); return; }
+  if (drag.mode === 'pan') {
+    if (sky3d.on) {                         // a drag turns the camera; with Shift it slides the view across the plane
+      const now = performance.now(), dtm = Math.max(1, now - drag.vt), dx = e.clientX - px, dy = e.clientY - py;
+      if (e.shiftKey) sky3d.api.rig.pan(dx, dy, scaleNow()); else sky3d.api.rig.orbit(dx, dy, view.h);
+      drag.fvx = drag.fvx * 0.5 + (dx / dtm * 1000) * 0.5; drag.fvy = drag.fvy * 0.5 + (dy / dtm * 1000) * 0.5; drag.vt = now;
+      syncFitBtn(); invalidate(); return;
+    }
+    cam.x -= (e.clientX - px) / cam.scale; cam.y += (e.clientY - py) / cam.scale; invalidate(); return;
+  }
   const q = bodyById(world.ic, drag.id); if (!q) return;
   if (drag.mode === 'body') {
-    q.x = wx(e.clientX) + drag.offx; q.y = wy(e.clientY) + drag.offy; minSeparationFix(q); commitEdit(true);
+    const w = unproj(e.clientX, e.clientY); if (!w) return;
+    q.x = w[0] + drag.offx; q.y = w[1] + drag.offy; minSeparationFix(q); commitEdit(true);
   } else if (drag.mode === 'vel') {
-    let vx = drag.v0x + (e.clientX - drag.sx) / world.arrowK, vy = drag.v0y - (e.clientY - drag.sy) / world.arrowK;
+    let vx, vy;
+    if (sky3d.on) { const w = unproj(e.clientX, e.clientY); if (!w) return; vx = (w[0] - q.x) / drag.hk - drag.hoffx; vy = (w[1] - q.y) / drag.hk - drag.hoffy; }
+    else { vx = drag.v0x + (e.clientX - drag.sx) / world.arrowK; vy = drag.v0y - (e.clientY - drag.sy) / world.arrowK; }
     let v = Math.hypot(vx, vy); const cap = 3.2 * world.vRef;
     if (v * world.arrowK < 8) { vx = vy = 0; v = 0; } else if (v > cap) { vx *= cap / v; vy *= cap / v; }
     if (v) world.dirMemo[q.id] = Math.atan2(vy, vx) * 180 / Math.PI;
@@ -2833,12 +2981,17 @@ function onUp(e) {
   if (drag.mode === 'pinch') { if (drag.pointers.size < 2) { drag.mode = drag.pointers.size ? 'pan' : null; const r = [...drag.pointers.keys()][0]; if (r !== undefined) drag.primary = r; } if (!drag.pointers.size) dom.sky.classList.remove('grabbing'); return; }
   if (e.pointerId !== drag.primary) return;
   const mode = drag.mode; drag.mode = null; dom.sky.classList.remove('grabbing');
+  if (mode === 'pan' && sky3d.on && !e.shiftKey && performance.now() - drag.vt < 90) sky3d.api.rig.fling(clamp(drag.fvx, -3000, 3000), clamp(drag.fvy, -3000, 3000), view.h);
   if (mode === 'body' || mode === 'vel') { commitEdit(false); }
   else if (mode === 'pending' && e.type === 'pointerup' && place.on) { placeAt(wx(e.clientX), wy(e.clientY)); }
   else if (mode === 'pending' && e.type === 'pointerup') {
     const now = performance.now();
+    const again = now - drag.lastTap < 340 && Math.hypot(e.clientX - drag.tapX, e.clientY - drag.tapY) < 32;
     if (!drag.hit) {
-      if (now - drag.lastTap < 340 && Math.hypot(e.clientX - drag.tapX, e.clientY - drag.tapY) < 32) { setAuto(true); drag.lastTap = 0; }
+      if (again) { setAuto(true); drag.lastTap = 0; }
+      else { drag.lastTap = now; drag.tapX = e.clientX; drag.tapY = e.clientY; }
+    } else if (sky3d.on && drag.hit.type === 'body') {   // a second tap on a body follows it
+      if (again) { followBody(drag.hit.id); drag.lastTap = 0; }
       else { drag.lastTap = now; drag.tapX = e.clientX; drag.tapY = e.clientY; }
     }
   }
@@ -2847,6 +3000,7 @@ function onUp(e) {
 function onWheel(e) {
   e.preventDefault();
   const k = Math.exp(-clamp(e.deltaY, -240, 240) * (e.ctrlKey ? 0.01 : 0.0022));
+  if (sky3d.on) { sky3d.api.dollyAt(1 / k, e.clientX, e.clientY); syncFitBtn(); refreshViewPane(); invalidate(); return; }
   const X = wx(e.clientX), Y = wy(e.clientY);
   cam.scale = clamp(cam.scale * k, 0.02, 2e5);
   cam.x = X - (e.clientX - view.cx) / cam.scale; cam.y = Y + (e.clientY - view.cy) / cam.scale;
@@ -2910,11 +3064,15 @@ function wire() {
     store.set('appearance', b.dataset.v); refreshViewPane();
   });
   dom.trailSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ui.view.trails = b.dataset.v; store.set('view', ui.view); refreshViewPane(); invalidate(); });
+  dom.modeSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setViewMode(b.dataset.v); });
+  dom.cameraSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; if (b.dataset.v === 'follow') followBody(world.sel); else setAuto(true); });
+  dom.angleSeg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !sky3d.on) return; sky3d.api.rig.setTilt(+b.dataset.v); invalidate(); });
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.view; ui.view[k] = !ui.view[k]; store.set('view', ui.view); refreshViewPane(); invalidate();
+    if (k === 'drift' && sky3d.api) sky3d.api.rig.drift = !!ui.view.drift;
     if (k === 'com' && ui.view.com) say('com', 'The cross marks the center of mass, the balance point of the whole group. Nothing the bodies do to one another can move it off its straight path.', true, { now: true });
   }));
-  [dom.trailSeg, dom.appearanceSeg].forEach(seg => seg.addEventListener('keydown', e => {
+  [dom.trailSeg, dom.appearanceSeg, dom.modeSeg, dom.cameraSeg].forEach(seg => seg.addEventListener('keydown', e => {
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
     const items = [...seg.children], i = items.indexOf(document.activeElement); if (i < 0) return;
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
@@ -2931,8 +3089,17 @@ function wire() {
     const t = e.target, onControl = t && t.closest && t.closest('button, input, summary, a, [tabindex="0"]');
     if (k === ' ' || k === 'Spacebar') { if (onControl) return; setPlaying(!world.playing); e.preventDefault(); return; }
     if (t && t.tagName === 'INPUT') return;
+    if (sky3d.on && !onControl) {           // turning, tilting and zooming the 3D camera
+      const rig = sky3d.api.rig, step = Math.PI / 12; let used = true;
+      if (k === 'ArrowLeft') rig.nudge(step, 0); else if (k === 'ArrowRight') rig.nudge(-step, 0);
+      else if (k === 'ArrowUp') rig.nudge(0, -step / 2); else if (k === 'ArrowDown') rig.nudge(0, step / 2);
+      else if (k === '[') rig.dolly(1.25); else if (k === ']') rig.dolly(0.8);
+      else if (k === '1') rig.setTilt(0.06); else if (k === '2') rig.setTilt(0.95); else if (k === '3') rig.setTilt(1.38);
+      else used = false;
+      if (used) { syncFitBtn(); refreshViewPane(); invalidate(); e.preventDefault(); return; }
+    }
     const c = k.toLowerCase();
-    if (c === 'r') restart(); else if (c === 'f') setAuto(true); else if (c === 'c') toggleSheet('custom');
+    if (c === 'r') restart(); else if (c === 'f') setAuto(true); else if (c === 'c') toggleSheet('custom'); else if (c === 'v') setViewMode(ui.view.mode === '3d' ? 'flat' : '3d');
     else if (c === 'h' && !dom.eraOut.hidden) toggleSheet('history'); else if (c === 's' && !dom.skyBtn.hidden) toggleSheet('skies');
     else if (k === '+' || k === '=') setSpeed(ui.speed + 1); else if (k === '-' || k === '_') setSpeed(ui.speed - 1); else return;
     e.preventDefault();
@@ -2941,7 +3108,7 @@ function wire() {
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 120));
   if (window.ResizeObserver) new ResizeObserver(resize).observe(document.body);
-  const onTheme = () => { readTheme(); refreshViewPane(); refreshBodies(); if (ui.sheet === 'preset') renderPresets(); };
+  const onTheme = () => { readTheme(); if (sky3d.api) sky3d.api.setTheme(theme); refreshViewPane(); refreshBodies(); if (ui.sheet === 'preset') renderPresets(); };
   if (drawerMQ.addEventListener) drawerMQ.addEventListener('change', resize);
   const onMotion = () => { reducedMotion = motionMQ.matches; if (reducedMotion) setPlaying(false); invalidate(); };
   if (motionMQ.addEventListener) motionMQ.addEventListener('change', onMotion);
@@ -2981,7 +3148,7 @@ function frame(now) {
   const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
   if (document.hidden) return;
   if (layoutDirty) measure();
-  if (!world.playing && now > dirtyUntil && !drag.mode) return;      // nothing is changing: leave the last picture up
+  if (!world.playing && now > dirtyUntil && !drag.mode && !(sky3d.on && sky3d.api.dirty)) return;      // nothing is changing: leave the last picture up
   tick(now, dt);
 }
 function tick(now, dt) {                   // one frame's worth of simulation and drawing
@@ -3009,6 +3176,8 @@ function tick(now, dt) {                   // one frame's worth of simulation an
 /* ------------------------------------------------------------------ start */
 function init() {
   readTheme(); wire(); resize(); measure();
+  const askedView = new URLSearchParams(location.search).get('view');
+  if (askedView === '3d' || askedView === 'flat') ui.view.mode = askedView;
   refreshViewPane();
   const saved = PRESETS.findIndex(p => p.id === store.get('preset', 'trisolaris'));
   const linked = skyFromHash(), seed = store.get('sky', 'default');
@@ -3018,10 +3187,11 @@ function init() {
   world.playing = !reducedMotion;
   refreshChrome(); measure();
   if (bodyRenderer) bodyRenderer.ready.then(() => { chipArtReady = true; refreshBodies(); invalidate(); }).catch(() => invalidate());
+  if (ui.view.mode === '3d') setViewMode('3d', { silent: true });
   requestAnimationFrame(frame);
 }
 init();
-window.__threeBody = { world, ui, cam, view, drawn, handleOf, throttle, insight, perf, drama, sx, sy, fitTarget, tick, visuals, eventEffects, bodyRenderer, climateTexture, resetVisuals };
+window.__threeBody = { world, ui, cam, view, drawn, sky3d, setViewMode, handleOf, throttle, insight, perf, drama, sx, sy, fitTarget, tick, visuals, eventEffects, bodyRenderer, climateTexture, resetVisuals };
 
 })();
 

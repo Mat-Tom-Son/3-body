@@ -14,5 +14,6 @@
     "assets:optimize": "node scripts/optimize-assets.mjs",
     "assets:rotation": "node scripts/optimize-rotation-assets.mjs"
   },
+  "dependencies": { "three": "0.186.1" },
   "devDependencies": { "sharp": "0.35.4" }
 }
