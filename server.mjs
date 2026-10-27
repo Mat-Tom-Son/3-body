@@ -65,7 +65,7 @@ export async function createAppServer({ root = defaultRoot } = {}) {
     catch { return send(400, 'Malformed URL\n'); }
     if (!requested.startsWith('/') || requested.includes('\\') || requested.includes('\0') || requested.split('/').some(part => part.startsWith('.'))) return send(404, 'Not found\n');
     if (requested === '/healthz') return send(200, '{"status":"ok"}\n', { 'Content-Type': 'application/json; charset=utf-8' });
-    const file = files.get(requested === '/' ? '/index.html' : requested);
+    const file = files.get(requested === '/' ? '/index.html' : requested) || (/^\/[\w-]+$/.test(requested) ? files.get(requested + '.html') : undefined);   // /3d serves 3d.html
     if (!file) return send(404, 'Not found\n');
     const encoding = chooseEncoding(req.headers['accept-encoding'], file.variants);
     if (!encoding) return send(406, 'No acceptable representation\n', { Vary: 'Accept-Encoding' });

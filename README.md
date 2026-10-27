@@ -1,6 +1,23 @@
 # Three-Body
 
-An interactive gravitational learning experience: explore orbital setups and follow a planet under three suns. The simulation runs in the browser; the server only delivers static files.
+An interactive gravitational learning experience: explore orbital setups and follow a world that could support life under one, two or three suns. The simulation runs in the browser; the server only delivers static files.
+
+## Systems
+
+The preset menu is grouped by how many suns a world lives under. Every system below uses published masses, brightnesses and orbits (cited in each system's notes on the page), and the page follows one world in each: its temperature is computed from the light it receives, and the civilization story, eras and history run on top exactly as they do for Trisolaris.
+
+| Group | System | Followed world | What it shows |
+|---|---|---|---|
+| One sun | Sun, Earth and Jupiter | Earth | Home at true scale; Jupiter's pull is a whisper |
+| One sun | TRAPPIST-1 | e | Seven tidally locked worlds in 1.5 to 19 day orbits round an ultracool dwarf |
+| One sun | Proxima Centauri | b | The nearest star's Earth-mass world, 11 days round a flaring red dwarf |
+| One sun | Kepler-442 | b | A rocky world in the warm zone, far enough out to keep a day and night |
+| Two suns | Alpha Centauri | a placed Earth-mass world 0.7 AU from B | S-type stability; A's closest pass every 80 years |
+| Two suns | Kepler-47 | c | Three real planets circling a 7-day binary; c in the habitable zone |
+| Three suns | Trisolaris | the planet | The novel's chaotic world, with seeded skies |
+| Three suns | Gliese 667 | Cc | A real three-sun sky: C warms the world, A and B are scenery 230 AU away |
+
+A body may carry metadata the integrator never reads: a name and label, a sun's tone and measured brightness (used instead of the mass rule), whether a world is tidally locked (it then keeps one face to the sun that lights it, in both views), and which world the page follows. The Classics group keeps the mathematical setups (Figure-eight, Moth, Lagrange's triangle, the slingshot and the rest) unchanged. `Gliese 667` frames its near sun and worlds and leaves A and B past the edge markers, since at 230 AU they add a few millionths of the planet's warmth.
 
 ## Run locally
 
@@ -43,6 +60,14 @@ npm run build
 The sprite optimizer expects the original PNGs and manifests under `output/body-assets-v2/` and `output/body-motion-v3/`. It performs only crop, resize, and WebP compression. Planet states share one crop to keep their silhouettes aligned. Other bodies use centered crops; debris is at most 64 px. The old square granulation texture is retired from the deployment. Exact settings, source checksums, output sizes, and output checksums are recorded in `scripts/asset-build-report.json`.
 
 For the rotating surfaces, `npm run assets:rotation` resizes and compresses the three generated masters in `output/body-rotation-v4/images/` to 512×256 WebPs. The built-in image generation prompts are recorded in `scripts/rotation-asset-prompts.json`, and the compression settings and checksums are in `scripts/rotation-asset-build-report.json`. The renderer handles longitude seams, poles, climate palettes, fixed limb shading, and continuous frame blending. The original masters, preview studies, earlier audio, and local browser artifacts remain excluded from the repository and deployed image.
+
+## 3D view
+
+**Customize → View → 3D** (or the V key, or [/?view=3d](http://localhost:3000/?view=3d)) draws the same simulation as lit, textured spheres over the orbital plane, with a camera that turns, tilts and zooms. Everything else on the page is unchanged: the gravity core, presets, trails, climate, civilizations, captions, history, editing by touch and undo all run exactly as in the flat chart, which stays the default. The 3D view is a renderer beneath the chart, not a second page: `src/sky3d.js` receives the page's bodies, trails, sizes and colours each frame, and the chart keeps drawing its own overlays (labels, velocity arrows, the path ahead, event effects, edge markers) through the 3D projection. The orbits remain planar; only the camera moves.
+
+The camera rig in `src/sky3d-model.js` has three modes. **Overview** frames every body and its recent trail inside the clear area of the screen, pulls back quickly when something leaves and closes in slowly, and turns very slowly while playing once the viewer has been idle for a few seconds (**Slow turn while playing** switches that off). **Follow** keeps a chosen body centred: double-tap a body, or pick **Follow selected** in the Camera control. Any zoom or Shift-drag hands the camera to the viewer; **Fit** (or F, or a double-tap on empty sky) returns to Overview. Drag turns the view with a fling, scroll or pinch zooms toward the pointer, the arrow keys turn and tilt, [ and ] zoom, and 1, 2, 3 jump to overhead, tilted and low angles. The rig and its fitting are plain arithmetic and are tested headlessly; the WebGL scene itself is checked by hand in a browser.
+
+Rendering uses [three.js](https://threejs.org), the project's only runtime dependency, loaded on demand so the flat page never downloads it. Files referenced as `vendor/<name>.js` from the page or its modules are copied from the installed package at build time, never committed; the page maps the bare `three` specifier to that copy with an import map. The five vendored files add about 365 KB Brotli-compressed, fetched only when the 3D view is chosen. Suns are emissive spheres with visible granulation, limb darkening and a point light each, so worlds have a real day and night side; spheres turn on fixed, tilted axes by the same simulated-progress clock as the flat surfaces but with shorter presentation periods (9 s for the planet, 16 s for the moon and 18/22/26 s for the suns at 1×), so the turning stays visible at 0.25×; worlds keep a faint self-glow of their climate colour so they stay readable at a few pixels across, and the planet carries a thin atmosphere whose colour follows its climate. Trails are screen-width ribbons that fade toward the tail. Both appearances are supported, reduced motion snaps the camera and stills the surfaces, and a browser without WebGL keeps the flat chart with a note. `/3d` redirects to the main page in 3D.
 
 ## Docker
 
