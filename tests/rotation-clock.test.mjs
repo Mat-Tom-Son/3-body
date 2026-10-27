@@ -44,7 +44,7 @@ function harness(rate = 6) {
 }
 
 test('rotation tracks every playback speed proportionally across preset simulation rates', () => {
-  assert.equal(rates.length, 9, 'cover every current preset');
+  assert.equal(rates.length, 16, 'cover every current preset');
   for (const rate of rates) for (let i = 0; i < speeds.length; i++) {
     const c = harness(rate);
     c.setSpeed(i);

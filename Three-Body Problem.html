@@ -656,9 +656,13 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     return { T, by };
   }
   const ripStress = m => m / (ROCHE * Math.pow(planetRadius(m), 3));
+  /* A star's brightness in Suns: a published value when the body carries one (meta.lum), else its mass to the 3.5, the
+     main-sequence rule of thumb. Worlds give no light. */
+  const lumOf = (m, meta) => (meta && meta.lum != null ? meta.lum : isStar(m) ? Math.pow(m, 3.5) : 0);
 
   class System {
-    /* bodies: [{id, m, x, y, vx, vy, parts?}] */
+    /* bodies: [{id, m, x, y, vx, vy, parts?, kind?, meta?}]. meta is an immutable bag of presentation facts
+       (name, label, tone, lum, locked, follow) that travels with the body and is never read by the integrator. */
     constructor(bodies, rtol) {
       this.rtol = rtol || RTOL;
       this.t = 0; this.steps = 0; this.rejects = 0;
@@ -674,6 +678,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       this.kind = bodies.map(b => b.kind || null);
       this.ripped = bodies.map(b => !!b.ripped);
       this.debris = bodies.map(b => b.debris || 0);
+      this.meta = bodies.map(b => b.meta || null);
       this.m = new Float64Array(n);
       this.y = new Float64Array(4*n);
       for (let i = 0; i < n; i++) {
@@ -696,7 +701,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     }
     bodies() {
       const n = this.n, out = [];
-      for (let i = 0; i < n; i++) out.push({ id: this.id[i], parts: this.parts[i].slice(), m: this.m[i], kind: this.kind[i], ripped: this.ripped[i], debris: this.debris[i],
+      for (let i = 0; i < n; i++) out.push({ id: this.id[i], parts: this.parts[i].slice(), m: this.m[i], kind: this.kind[i], ripped: this.ripped[i], debris: this.debris[i], meta: this.meta[i],
         x: this.y[2*i], y: this.y[2*i+1], vx: this.y[2*n+2*i], vy: this.y[2*n+2*i+1] });
       return out;
     }
@@ -858,7 +863,9 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
       const fin = v => (v === v && Math.abs(v) < Infinity);
       let x = (a.m*a.x + b.m*b.x)/M, yy = (a.m*a.y + b.m*b.y)/M;
       if (!fin(x) || !fin(yy)) { x = a.x; yy = a.y; }
-      const merged = { id: keep.id, parts: a.parts.concat(b.parts).sort(), m: M, x, y: yy, kind: keep.kind, ripped: keep.ripped, debris: keep.debris,
+      let meta = keep.meta;
+      if (isStar(M) && ((a.meta && a.meta.lum != null) || (b.meta && b.meta.lum != null))) meta = Object.assign({}, meta, { lum: lumOf(a.m, a.meta) + lumOf(b.m, b.meta) });
+      const merged = { id: keep.id, parts: a.parts.concat(b.parts).sort(), m: M, x, y: yy, kind: keep.kind, ripped: keep.ripped, debris: keep.debris, meta,
         vx: (a.m*a.vx + b.m*b.vx)/M, vy: (a.m*a.vy + b.m*b.vy)/M };
       const list = bs.filter((_, k) => k !== i && k !== j).concat([merged]).sort((p, q) => p.id - q.id);
       this._set(list);
@@ -929,7 +936,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     return out;
   }
 
-  const api = { System, escaping, bodyRadius, starRadius, planetRadius, isStar, tideOn, ripStress, RTOL, R_SUN_MASS, STAR_MIN };
+  const api = { System, escaping, bodyRadius, starRadius, planetRadius, isStar, lumOf, tideOn, ripStress, RTOL, R_SUN_MASS, STAR_MIN };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Physics = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -944,7 +951,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     for (const q of b) { q.x -= cx/M; q.y -= cy/M; q.vx -= vx/M; q.vy -= vy/M; }
     return b;
   }
-  const B = (id, m, x, y, vx, vy, kind) => (kind ? { id, m, x, y, vx, vy, kind } : { id, m, x, y, vx, vy });
+  const B = (id, m, x, y, vx, vy, kind, meta) => { const b = { id, m, x, y, vx, vy }; if (kind) b.kind = kind; if (meta) b.meta = meta; return b; };
   /* two bodies about their shared centre: semi-major axis a, eccentricity e, apoapsis in direction phi */
   function pairUp(b1, b2, a, e, phi) {
     const M = b1.m + b2.m, r = a * (1 + e), v = Math.sqrt(M * (2 / r - 1 / a)), ux = Math.cos(phi), uy = Math.sin(phi);
@@ -988,9 +995,77 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     const P = B(3, (c.mp || 3) * M_EARTH, C.x + c.ap * cp, C.y + c.ap * sp, C.vx - vp * sp, C.vy + vp * cp, 'planet');
     return toCOM([A, Bb, C, P]);
   }
+
+  /* ---- Real systems. Masses in Suns, distances in AU, brightness in Suns, from the published values quoted in each
+     system's notes on the page. A body's meta carries what the physics does not need: its name and label, a sun's tone
+     and brightness, whether a world is tidally locked, and which world the page follows. The motion is computed. */
+  const J = 1 / 1047.3486;
+  const sun = (id, m, meta) => B(id, m, 0, 0, 0, 0, null, meta);
+  const world = (id, m, kind, meta) => B(id, m, 0, 0, 0, 0, kind, meta);
+  /* a body on a Kepler orbit about a host, starting at apoapsis in direction phi and turning anticlockwise; the host is left as it is */
+  function around(host, b, a, e, phi) {
+    const mu = host.m + b.m, r = a * (1 + e), v = Math.sqrt(mu * (2 / r - 1 / a)), ux = Math.cos(phi), uy = Math.sin(phi);
+    b.x = host.x + r * ux; b.y = host.y + r * uy; b.vx = host.vx - v * uy; b.vy = host.vy + v * ux;
+    return b;
+  }
+  const origin = m => ({ m, x: 0, y: 0, vx: 0, vy: 0 });
+  function homeSystem() {                 // JPL planetary fact sheets
+    const S = sun(0, 1, { name: 'the Sun', label: 'S', tone: 'amber', lum: 1 });
+    const earth = around(S, world(1, M_EARTH, 'planet', { name: 'Earth', label: 'E', follow: true }), 1.0, 0.0167, 0.4);
+    const jupiter = around(S, world(2, J, null, { name: 'Jupiter', label: 'J' }), 5.2044, 0.0489, 3.9);
+    return toCOM([S, earth, jupiter]);
+  }
+  function trappistSystem() {             // Agol et al. 2021; Gillon et al. 2017
+    const T = sun(0, 0.0898, { name: 'TRAPPIST-1', label: 'T', tone: 'coral', lum: 5.66e-4 });
+    const P = [['b', 1.374, 0.01154], ['c', 1.308, 0.01580], ['d', 0.388, 0.02227], ['e', 0.692, 0.02925], ['f', 1.039, 0.03849], ['g', 1.321, 0.04683], ['h', 0.326, 0.06189]];
+    const list = [T];
+    P.forEach(([l, m, a], k) => list.push(around(T, world(k + 1, m * M_EARTH, 'planet', { name: 'TRAPPIST-1 ' + l, label: l, locked: true, follow: l === 'e' }), a, 0, (k * 2.399) % 6.2832)));
+    return toCOM(list);
+  }
+  function proximaSystem() {              // Anglada-Escudé et al. 2016; Faria et al. 2022
+    const P = sun(0, 0.1221, { name: 'Proxima', label: 'P', tone: 'coral', lum: 0.0017 });
+    const d = around(P, world(1, 0.26 * M_EARTH, 'planet', { name: 'Proxima d', label: 'd', locked: true }), 0.02885, 0, 2.1);
+    const b = around(P, world(2, 1.07 * M_EARTH, 'planet', { name: 'Proxima b', label: 'b', locked: true, follow: true }), 0.04856, 0, 5.0);
+    return toCOM([P, d, b]);
+  }
+  function kepler442System() {            // Torres et al. 2015
+    const K = sun(0, 0.61, { name: 'Kepler-442', label: 'K', tone: 'amber', lum: 0.117 });
+    const b = around(K, world(1, 2.3 * M_EARTH, 'planet', { name: 'Kepler-442 b', label: 'b', follow: true }), 0.409, 0.04, 1.2);
+    return toCOM([K, b]);
+  }
+  function alphaCenSystem() {             // Pourbaix & Boffin 2016; Akeson et al. 2021. The planet is placed, not found.
+    const A = sun(0, 1.0788, { name: 'Alpha Centauri A', tone: 'amber', lum: 1.5059 }), Bb = sun(1, 0.9092, { name: 'Alpha Centauri B', tone: 'coral', lum: 0.4981 });
+    pairUp(A, Bb, 23.299, 0.5195, 2.4);
+    const p = around(Bb, world(2, M_EARTH, 'planet', { placed: true, follow: true }), 0.70, 0, 0.8);
+    return toCOM([A, Bb, p]);
+  }
+  function kepler47System() {             // Orosz et al. 2012, 2019
+    const A = sun(0, 0.957, { name: 'Kepler-47 A', tone: 'amber', lum: 0.840 }), Bb = sun(1, 0.342, { name: 'Kepler-47 B', tone: 'coral', lum: 0.014 });
+    pairUp(A, Bb, 0.08145, 0.0288, 0.6);
+    const both = origin(A.m + Bb.m);
+    const b = around(both, world(2, 2.07 * M_EARTH, 'planet', { name: 'Kepler-47 b', label: 'b' }), 0.2877, 0.021, 3.3);
+    const d = around(both, world(3, 19.0 * M_EARTH, 'planet', { name: 'Kepler-47 d', label: 'd' }), 0.6992, 0.024, 5.1);
+    const c = around(both, world(4, 3.17 * M_EARTH, 'planet', { name: 'Kepler-47 c', label: 'c', follow: true }), 0.9638, 0.044, 1.0);
+    return toCOM([A, Bb, b, d, c]);
+  }
+  function gliese667System() {            // Anglada-Escudé et al. 2013; Delfosse et al. 2013. C's orbit about the pair is assumed circular.
+    const A = sun(0, 0.73, { name: 'Gliese 667 A', tone: 'amber', lum: 0.12 }), Bb = sun(1, 0.69, { name: 'Gliese 667 B', tone: 'amber', lum: 0.06 });
+    pairUp(A, Bb, 13.6, 0.58, 1.1);
+    const C = around(origin(A.m + Bb.m), sun(2, 0.33, { name: 'Gliese 667 C', tone: 'coral', lum: 0.0137 }), 230, 0, 4.2);
+    const b = around(C, world(3, 5.6 * M_EARTH, 'planet', { name: 'Gliese 667 Cb', label: 'b', locked: true }), 0.0505, 0, 2.6);
+    const c = around(C, world(4, 3.8 * M_EARTH, 'planet', { name: 'Gliese 667 Cc', label: 'c', locked: true, follow: true }), 0.125, 0.02, 0.4);
+    return toCOM([A, Bb, C, b, c]);
+  }
   const PRESETS = [
-    { id: 'trisolaris', name: 'Trisolaris', tag: 'A world under three suns', group: 'Worlds', rate: 6, trail: 12, period: 6.3, skies: true,
+    { id: 'home', name: 'Sun, Earth and Jupiter', tag: 'Home, with Jupiter tugging', group: 'One sun', rate: 3, trail: 2.5, period: 6.283, make: homeSystem },
+    { id: 'trappist', name: 'TRAPPIST-1', tag: 'Seven worlds round a red dwarf', rate: 0.05, trail: 0.12, period: 0.105, make: trappistSystem },
+    { id: 'proxima', name: 'Proxima Centauri', tag: 'The nearest star, the nearest world', rate: 0.1, trail: 0.25, period: 0.193, make: proximaSystem },
+    { id: 'kepler442', name: 'Kepler-442', tag: 'A quiet world in the warm zone', rate: 0.6, trail: 0.7, period: 1.93, make: kepler442System },
+    { id: 'alphacen', name: 'Alpha Centauri', tag: 'A placed world under the nearer sun', group: 'Two suns', rate: 3, trail: 2.5, period: 3.86, make: alphaCenSystem },
+    { id: 'kepler47', name: 'Kepler-47', tag: 'Three planets circling two suns', rate: 0.3, trail: 1.3, period: 5.21, make: kepler47System },
+    { id: 'trisolaris', name: 'Trisolaris', tag: 'A world under three suns', group: 'Three suns', rate: 6, trail: 12, period: 6.3, skies: true,
       make: (sky) => trisolarisBodies(sky || TRISOLARIS_DEFAULT) },
+    { id: 'gj667', name: 'Gliese 667', tag: 'A real world with three suns in its sky', rate: 0.15, trail: 0.6, period: 0.484, frame: [2, 3, 4], frameSize: 0.3, make: gliese667System },
     { id: 'eight', name: 'Figure-eight', tag: 'Stable dance', group: 'Classics', rate: 1.6, trail: 2.3, wide: true, period: 6.32591398251509,
       make: () => line(0.347116887991313, 0.532724945454650) },
     { id: 'moth', name: 'Moth', tag: 'Rare repeating pattern', rate: 2.4, trail: 7.6, period: 14.8943051750219,
@@ -1018,7 +1093,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
   ];
   /* A world dropped into a setup: a circular orbit about a host body (or, with host -1, about everything), turning the
      same way as the system as a whole. Vetted spots live in PLANET_SPOTS; anything else gets a warm, uncrowded orbit. */
-  const LUM = m => Math.pow(m, 3.5);
+  const LUM = q => (q.meta && q.meta.lum != null ? q.meta.lum : Math.pow(q.m, 3.5));
   function withPlanet(bodies, spot) {
     const list = bodies.map(q => Object.assign({}, q));
     const stars = list.filter(q => q.m >= 0.05);
@@ -1037,13 +1112,13 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
     if (!stars.length) return { host: bodies[0].id, r: 0.05, phi: Math.PI / 2 };
     /* around one star, if its warm distance is well inside the gap to its nearest neighbour */
     for (const h of stars) {
-      const r = Math.sqrt(LUM(h.m));
+      const r = Math.sqrt(LUM(h));
       let near = Infinity; for (const q of bodies) if (q !== h) near = Math.min(near, Math.hypot(q.x - h.x, q.y - h.y));
       if (r < 0.3 * near) return { host: h.id, r, phi: Math.PI / 2 };
     }
     /* otherwise around everything, outside the crowd even if that runs cold */
     let sep = 0; for (const a of stars) for (const b of stars) sep = Math.max(sep, Math.hypot(a.x - b.x, a.y - b.y));
-    const L = stars.reduce((a, q) => a + LUM(q.m), 0);
+    const L = stars.reduce((a, q) => a + LUM(q), 0);
     return { host: -1, r: Math.max(Math.sqrt(L), 2.6 * sep), phi: Math.PI / 2 };
   }
   /* Vetted from a few hundred trial placements per setup. Each was chosen for the story it tells:
@@ -1077,7 +1152,7 @@ input[type="range"]:focus-visible { outline-offset: -2px; border-radius: 12px; }
 <script>
 (function () {
 'use strict';
-const { System, escaping, bodyRadius, isStar } = window.Physics;
+const { System, escaping, bodyRadius, isStar, lumOf, starRadius } = window.Physics;
 const { PRESETS, bodiesFor, withPlanet, warmSpot, PLANET_SPOTS, skyFromSeed, trisolarisBodies, TRISOLARIS_DEFAULT, SKIES } = window.Presets;
 const SKY_LIST = [{ key: 'default', name: 'Trisolaris', tag: 'Five civilizations and an ending', c: TRISOLARIS_DEFAULT }]
   .concat(SKIES.map(k => ({ key: k.seed, seed: k.seed, name: k.seed[0].toUpperCase() + k.seed.slice(1), tag: k.tag, c: skyFromSeed(k.seed) })));
@@ -1113,6 +1188,51 @@ const MINUS = '\u2212';
 
 /* ------------------------------------------------------------------ copy */
 const COPY = {
+  home: {
+    caption: 'The Sun, Earth and Jupiter at their true masses and distances. Earth keeps a steady orbit, and Jupiter’s pull barely stirs it.',
+    note: [
+      'Earth sits 1 AU from the Sun on a nearly circular orbit. Jupiter, 318 times heavier than Earth, circles at 5.2 AU every 11.9 years. Over thousands of years its pull changes the shape of Earth’s orbit by a few hundredths, one of the rhythms behind the ice ages. The Sun here is 1 Sun bright, so Earth receives Earth’s sunlight, and its temperature follows from that alone.',
+      'The Moon is left out: at these scales it would sit inside Earth’s dot. Masses, distances and orbit shapes are the measured values from the JPL planetary fact sheets.',
+    ] },
+  trappist: {
+    caption: 'Seven Earth-sized worlds crowd a star one twelfth the mass of the Sun. The fourth, e, gets two thirds of Earth’s light.',
+    note: [
+      'TRAPPIST-1, 40 light-years away, is an ultracool red dwarf with 9 percent of the Sun’s mass and one two-thousandth of its light. Its seven known planets, b to h, all orbit closer than Mercury does to the Sun, in 1.5 to 19 days. Three or four of them, d to g, sit where water could stay liquid.',
+      'The planets are so close that the star’s tides have almost certainly locked them, one face in permanent day, and the spheres here keep that face to the star. The orbits are nearly circular and nearly in step: neighbours keep near whole-number ratios of periods, a chain that formed as they drifted inward through the disc that made them.',
+      'Masses, orbits and the star’s brightness follow Agol et al. 2021 and Gillon et al. 2017, as listed in the NASA Exoplanet Archive. The page follows e, the most Earth-like of the four.',
+    ] },
+  proxima: {
+    caption: 'The Sun’s nearest neighbour, a red dwarf, with a world the mass of Earth circling it every 11 days at a twentieth of Earth’s distance.',
+    note: [
+      'Proxima Centauri is 4.2 light-years away, has 12 percent of the Sun’s mass and gives off less than a fifth of a percent of its light. Proxima b, found in 2016 from the wobble it gives the star, receives about two thirds of the sunlight Earth does. A smaller world, d, circles inside it every five days.',
+      'Proxima flares: its brightness can jump a hundredfold in hours, and that may have stripped the planet’s air long ago. Whether it has an atmosphere is unknown. It is probably tidally locked, one hemisphere always facing the star, and the spheres here keep that face.',
+      'Proxima is the third star of the Alpha Centauri system, 13,000 AU from the bright pair; at that distance they do not move it here. Numbers: Anglada-Escudé et al. 2016, Faria et al. 2022, NASA Exoplanet Archive.',
+    ] },
+  kepler442: {
+    caption: 'A rocky world a third bigger than Earth, circling an orange dwarf in the warm zone every 112 days, with nothing nearby to disturb it.',
+    note: [
+      'Kepler-442, 1,200 light-years away, is a K-type star with 61 percent of the Sun’s mass and 12 percent of its light. Its planet b receives about 70 percent of Earth’s sunlight. Among known rocky worlds in habitable zones it is one of the most Earth-like, and it sits just outside the distance at which the star’s tides would have locked it, so it can keep a day and a night.',
+      'With one star and one planet, this orbit is the plain ellipse Newton solved: nothing here can go wrong for billions of years. It is the calm the other systems are measured against. Numbers: Torres et al. 2015, NASA Exoplanet Archive.',
+    ] },
+  alphacen: {
+    caption: 'The nearest Sun-like pair, 80 years to circle each other. The world here is placed, not found: it sits where B’s light is Earth-like.',
+    note: [
+      'Alpha Centauri A and B, 4.4 light-years away, are stars of 1.08 and 0.91 Suns on an orbit that brings them between 11 and 36 AU apart. No planet has been confirmed around either, so this one is placed: an Earth-mass world 0.7 AU from B, where B’s light is about what Earth receives from the Sun.',
+      'A world around one star of a pair is stable only well inside its own star’s pull: for B, within roughly 2.5 AU. At 0.7 AU the planet is safe, and A’s light adds a few tenths of a percent. Watch when A passes closest, 40 years from the start and every 80 years after: the planet’s orbit flexes slightly and recovers. Numbers: Pourbaix & Boffin 2016, Akeson et al. 2021.',
+    ] },
+  kepler47: {
+    caption: 'Two suns 7 days apart, and three planets circling both at once. The outer one, c, orbits in the warm zone every 303 days.',
+    note: [
+      'Kepler-47, 3,400 light-years away, has a Sun-like star of 0.96 Suns and a red dwarf of 0.34 Suns whirling 0.08 AU apart. Three planets circle the pair: b in 49 days, d in 187, and c in 303 days at 0.96 AU, inside the habitable zone. c is 4.7 times Earth’s width, so it is probably wrapped in thick gas; if anything lives here it may be on a moon of it.',
+      'A planet circling two stars is only stable beyond two to four times the stars’ separation, depending on their masses and orbit. Here that limit is about 0.2 AU; b sits at 0.29, just outside it. Numbers: Orosz et al. 2012 and 2019, NASA Exoplanet Archive.',
+    ] },
+  gj667: {
+    caption: 'A real world with three suns in its sky. One warms it; the other two are bright stars 230 AU away, and the view follows the near sun.',
+    note: [
+      'Gliese 667, 23 light-years away, is three stars: a pair of orange dwarfs, A and B, circling each other every 42 years, and a red dwarf, C, about 230 AU from them. C has at least two planets. The outer, Cc, weighs 3.8 Earths, orbits every 28 days and receives about 90 percent of Earth’s light, placing it in C’s habitable zone.',
+      'From Cc, A and B would shine like two brilliant points, far brighter than Venus from Earth, yet together they add a few millionths of the warmth C gives. Real three-sun worlds are like this: the extra suns are scenery, kept far enough away to leave the planet’s orbit alone. The view frames C and its planets; A and B sit beyond the edge markers. C is so close that its tides have probably locked Cc, and the spheres keep one face to it.',
+      'C’s orbit about the pair is not known, only its present separation, so a circular orbit at 230 AU is assumed. Numbers: Anglada-Escudé et al. 2013, Delfosse et al. 2013, NASA Exoplanet Archive.',
+    ] },
   eight: {
     caption: 'Three equal stars chase one another around a single figure-eight. It repeats forever, and a small nudge will not break it.',
     note: [
@@ -1173,7 +1293,8 @@ const COPY = {
       'Along the way two of the bodies pass within 0.0004 AU of each other, about 60,000 km, moving at thousands of km/s. The calculation takes far smaller time steps during that pass so that the outcome can be trusted.',
     ] },
 };
-const THUMB_T = { eight: 6.33, moth: 14.9, triangle: 8.27, moon: 6.3, suns: 12.7, trisolaris: 75, sling: 9, swap: 13, pyth: 21 };
+const THUMB_T = { eight: 6.33, moth: 14.9, triangle: 8.27, moon: 6.3, suns: 12.7, trisolaris: 75, sling: 9, swap: 13, pyth: 21,
+  home: 6.3, trappist: 0.35, proxima: 0.6, kepler442: 2.0, alphacen: 12, kepler47: 5.3, gj667: 1.0 };
 
 const SCI = {
   why: ['Why three is hard', [
@@ -1228,10 +1349,12 @@ function fmtOneIn(d) {
 }
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const isWorld = b => b.kind === 'planet' || b.kind === 'moon';
-const labelOf = b => { const s = b.parts.filter(p => p < LETTERS.length).map(i => LETTERS[i]).join(''); return s || (b.kind === 'moon' ? 'M' : 'P'); };
-const nameOf = b => (b.kind === 'planet' ? 'the planet' : b.kind === 'moon' ? 'the moon' : isStar(b.m) ? 'sun ' + labelOf(b) : 'the giant planet ' + labelOf(b));
+const labelOf = b => { if (b.meta && b.meta.label) return b.meta.label; const s = b.parts.filter(p => p < LETTERS.length).map(i => LETTERS[i]).join(''); return s || (b.kind === 'moon' ? 'M' : 'P'); };
+const nameOf = b => (b.meta && b.meta.name ? b.meta.name : b.kind === 'planet' ? 'the planet' : b.kind === 'moon' ? 'the moon' : isStar(b.m) ? 'sun ' + labelOf(b) : 'the giant planet ' + labelOf(b));
+const sunCount = list => (list || world.cur).filter(q => isStar(q.m) && !isWorld(q)).length;
+const sunsWord = n => (n === 1 ? 'sun' : 'suns');
 const capName = b => { const n = nameOf(b); return n[0].toUpperCase() + n.slice(1); };
-const cloneBodies = list => list.map(b => ({ id: b.id, parts: (b.parts || [b.id]).slice(), m: b.m, x: b.x, y: b.y, vx: b.vx, vy: b.vy, kind: b.kind || null, ripped: !!b.ripped, debris: b.debris || 0 }));
+const cloneBodies = list => list.map(b => ({ id: b.id, parts: (b.parts || [b.id]).slice(), m: b.m, x: b.x, y: b.y, vx: b.vx, vy: b.vy, kind: b.kind || null, ripped: !!b.ripped, debris: b.debris || 0, meta: b.meta || null }));
 
 /* ------------------------------------------------------------------ persistence */
 const store = {
@@ -1277,7 +1400,7 @@ const ui = {
 const world = {
   pi: 0, preset: PRESETS[0], sky: SKY_LIST[0], portrait: false, ic: [], edited: false,
   sys: null, t: 0, playing: false,
-  R0: 1, vRef: 1, arrowK: 56, com0: [0, 0],
+  R0: 1, S0: 1, vRef: 1, arrowK: 56, com0: [0, 0],
   trails: newTrails(),
   cur: [], escaped: new Set(), evSeen: 0,
   sel: 0, dirMemo: {},
@@ -1365,25 +1488,25 @@ function sampleBodies(S, t) {
   const buf = bufFor(S.n);
   S.sample(t, buf);
   const out = [];
-  for (let i = 0; i < S.n; i++) out.push({ id: S.id[i], parts: S.parts[i], m: S.m[i], kind: S.kind[i], ripped: S.ripped[i], debris: S.debris[i],
+  for (let i = 0; i < S.n; i++) out.push({ id: S.id[i], parts: S.parts[i], m: S.m[i], kind: S.kind[i], ripped: S.ripped[i], debris: S.debris[i], meta: S.meta[i],
     x: buf[4 * i], y: buf[4 * i + 1], vx: buf[4 * i + 2], vy: buf[4 * i + 3] });
   return out;
 }
 
 /* ------------------------------------------------------------------ climate on a world, and the civilizations that live by it */
-const LUM = m => Math.pow(m, 3.5);                     // a star's brightness in Suns, from its mass
+/* a star's brightness comes from Physics.lumOf: a published value when the body carries one, else its mass to the 3.5 */
 const CLIMATE = { T0: 288, TAU: 0.25 * TU_YEAR, COLD: 235, HOT: 320, CALM_LO: 245, CALM_HI: 310, F_COLD: 0.01, F_HOT: 8, CALM: 1 * TU_YEAR, STABLE: 50 * TU_YEAR,
   HIST_N: 400, HIST_DT: 0.05 * TU_YEAR, SWING: 20, ERA: 3 * TU_YEAR, LOG_EVERY: 5 };   // the ribbon holds 20 years; an era is stable after 3 quiet years; the long log keeps every 5th sample
 function fluxOn(list, p) {                             // sunlight reaching p, in Earth's units, and each sun's share
   let F = 0; const shares = [];
-  for (const s of list) { if (s === p || !isStar(s.m)) continue; const d2 = (s.x - p.x) ** 2 + (s.y - p.y) ** 2, f = LUM(s.m) / d2; F += f; shares.push([s, f]); }
+  for (const s of list) { if (s === p || !isStar(s.m)) continue; const d2 = (s.x - p.x) ** 2 + (s.y - p.y) ** 2, f = lumOf(s.m, s.meta) / d2; F += f; shares.push([s, f]); }
   return { F, shares };
 }
 const eqTemp = F => CLIMATE.T0 * Math.pow(F, 0.25);
 const fmtC = T => signed(Math.round(T - 273.15), 0) + ' °C';
 const fmtYearsPlain = t => { const y = t / TU_YEAR; return y < 1 ? 'less than a year' : y < 1.5 ? 'a year' : Math.round(y) + ' years'; };
 function initCivs() {
-  const p = world.ic.find(b => b.kind === 'planet');
+  const p = world.ic.find(b => b.meta && b.meta.follow) || world.ic.find(b => b.kind === 'planet');   // the world the page follows
   world.civ = p ? { id: p.id, T: null, F: 0, alive: false, n: 0, born: 0, calmSince: 0, exiled: false, over: false, stableSaid: false,
     hist: new Float32Array(CLIMATE.HIST_N), histAt: 0, histLen: 0, histNext: 0, rough: -Infinity, era: null, eraSaid: null,
     eraAnnounced: 'stable', eraPending: null, eraAt: 0, host: null, hostCand: null, hostSince: 0,
@@ -1400,7 +1523,7 @@ function climateStep(S) {                               // after every accepted 
   const i = S.id.indexOf(c.id); if (i < 0) return;
   const n = S.n, m = S.m, y = S.y, px = y[2 * i], py = y[2 * i + 1];
   let F = 0;
-  for (let j = 0; j < n; j++) if (j !== i && isStar(m[j])) { const dx = y[2 * j] - px, dy = y[2 * j + 1] - py; F += LUM(m[j]) / (dx * dx + dy * dy); }
+  for (let j = 0; j < n; j++) if (j !== i && isStar(m[j])) { const dx = y[2 * j] - px, dy = y[2 * j + 1] - py; F += lumOf(m[j], S.meta[j]) / (dx * dx + dy * dy); }
   const Teq = eqTemp(F), dt = S.t - S.tPrev;
   c.T = c.T === null ? Teq : c.T + (Teq - c.T) * (1 - Math.exp(-dt / CLIMATE.TAU));     // oceans and air take months to answer
   c.F = F;
@@ -1427,7 +1550,7 @@ function climateStep(S) {                               // after every accepted 
   } else if (calm && !c.exiled && S.t - c.calmSince > CLIMATE.CALM) {
     c.alive = true; c.n++; c.born = S.t; c.stableSaid = false;
     const bs = S.bodies(), o = orbitAbout(bs, bs[i]);
-    const text = 'Civilization ' + c.n + ' begins' + (o && o.bound ? ' under sun ' + labelOf(o.host) + ', ' + AU(o.r) + ' out.' : '.');
+    const text = 'Civilization ' + c.n + ' begins' + (o && o.bound ? ' under ' + nameOf(o.host) + ', ' + AU(o.r) + ' out.' : '.');
     say('civBorn', text, true, { group: 'civb', replaces: 'civb' }); chronicle('born', text);
     slowFor(1200, 0.5);
   }
@@ -1452,21 +1575,22 @@ function watchHost(S, i) {                              // which sun holds the p
   if (id !== c.hostCand) { c.hostCand = id; c.hostSince = S.t; return; }
   if (id === c.host || S.t - c.hostSince < TU_YEAR) return;
   const was = c.host; c.host = id;
-  const text = id === -1 ? 'The planet is loose between the suns, held by none of them.'
-    : was === -1 ? 'Sun ' + labelOf(o.host) + ' has caught the planet. It now circles from ' + AU(o.peri) + ' to ' + AU(o.apo) + '.'
-    : 'The planet has been handed from sun ' + labelOf(bodyById(bs, was) || o.host) + ' to sun ' + labelOf(o.host) + '.';
+  const text = id === -1 ? (sunCount(bs) === 1 ? 'The planet has come loose from its sun.' : 'The planet is loose between the suns, held by none of them.')
+    : was === -1 ? capName(o.host) + ' has caught the planet. It now circles from ' + AU(o.peri) + ' to ' + AU(o.apo) + '.'
+    : 'The planet has been handed from ' + nameOf(bodyById(bs, was) || o.host) + ' to ' + nameOf(o.host) + '.';
   say('host', text, true, { group: 'host', replaces: 'host' }); chronicle('host', text);
   slowFor(1500, 0.5);
 }
 function eraChanged(S, i) {
   const c = world.civ, bs = S.bodies(), p = bs[i], o = orbitAbout(bs, p);
   let text;
-  if (c.era === 'stable') text = 'A Stable Era begins. ' + (o && o.bound ? 'The planet circles sun ' + labelOf(o.host) + ' at a steady ' + AU(o.a) + ', the other suns far off.' : 'The skies have settled.');
+  const suns = sunCount(bs);
+  if (c.era === 'stable') text = 'A Stable Era begins. ' + (o && o.bound ? 'The planet circles ' + nameOf(o.host) + ' at a steady ' + AU(o.a) + (suns > 2 ? ', the other suns far off.' : suns === 2 ? ', the other sun far off.' : '.') : 'The skies have settled.');
   else {
     const { F, shares } = fluxOn(bs, p), others = shares.filter(([q]) => !o || q !== o.host), share = others.reduce((a, [, f]) => a + f, 0) / F;
     if (o && o.bound && o.e > 0.3) text = 'A Chaotic Era begins. The planet’s orbit has been stretched: it now swings from ' + AU(o.peri) + ' to ' + AU(o.apo) + ', burning and freezing in turn.';
-    else if (share > 0.1) text = 'A Chaotic Era begins. The other suns are closing in, and their light now reaches the planet too.';
-    else text = 'A Chaotic Era begins. The suns are stirring the planet’s orbit, and the seasons no longer repeat.';
+    else if (share > 0.1) text = 'A Chaotic Era begins. ' + (suns === 2 ? 'The other sun is closing in, and its light now reaches the planet too.' : 'The other suns are closing in, and their light now reaches the planet too.');
+    else text = 'A Chaotic Era begins. ' + (suns === 1 ? 'The other worlds are stirring the planet’s orbit' : 'The suns are stirring the planet’s orbit') + ', and the seasons no longer repeat.';
   }
   /* an era caption still waiting to be shown means the sky flipped back before anyone saw it: drop both */
   const waiting = insight.queue.some(q => q.group === 'era');
@@ -1485,10 +1609,10 @@ function endCiv(S, i, band) {                           // band: 1 hot, -1 cold
     const big = shares.filter(([, f]) => f > 0.25 * F).sort((a, b) => dist(a) - dist(b));
     if (big.length >= 3) why = 'fire after ' + age + ': three suns rose together';
     else if (big.length === 2) why = 'fire after ' + age + ': two suns rose together, ' + AU(dist(big[0])) + ' and ' + AU(dist(big[1])) + ' away';
-    else { const s = big[0] || shares.slice().sort((a, b) => dist(a) - dist(b))[0]; why = 'fire after ' + age + ': sun ' + labelOf(s[0]) + ' came within ' + AU(dist(s)); }
+    else { const s = big[0] || shares.slice().sort((a, b) => dist(a) - dist(b))[0]; why = 'fire after ' + age + ': ' + nameOf(s[0]) + ' came within ' + AU(dist(s)); }
   } else {
     const near = shares.slice().sort((a, b) => dist(a) - dist(b))[0];
-    why = 'ice after ' + age + ': every sun was far away, the nearest ' + AU(dist(near));
+    why = 'ice after ' + age + (sunCount(bs) === 1 ? ': ' + nameOf(near[0]) + ' was ' + AU(dist(near)) + ' away' : ': every sun was far away, the nearest ' + AU(dist(near)));
   }
   const text = 'Civilization ' + c.n + ' ended in ' + why + '.';
   say('civEnd', text, true, { group: 'civd', replaces: 'civd', urgent: true }); chronicle(band > 0 ? 'hot' : 'cold', text);
@@ -1603,6 +1727,7 @@ function resetRun(opts) {
   clearRunState();
   world.sys = new System(cloneBodies(world.ic));
   world.R0 = maxSeparation(world.ic) || 1;
+  world.S0 = world.preset.frameSize || world.R0;   // the size the camera thinks in; R0 stays the physical extent used for escapes
   world.com0 = centerOfMass(world.ic);
   world.cur = sampleBodies(world.sys, 0);
   initCivs();
@@ -1657,7 +1782,7 @@ function dramaTarget(now) {
     if (p) {
       const { F, shares } = fluxOn(world.cur, p);
       if (F > 3) f = Math.min(f, 0.2);                                            // scorching: a sun is very close
-      for (const [q] of shares) if (Math.hypot(q.x - p.x, q.y - p.y) < 0.08) f = Math.min(f, 0.12);   // a grazing pass
+      for (const [q] of shares) if (Math.hypot(q.x - p.x, q.y - p.y) < 17 * starRadius(q.m)) f = Math.min(f, 0.12);   // a grazing pass: within 17 stellar radii, 0.08 AU for a Sun
     }
   }
   return f;
@@ -1706,7 +1831,7 @@ function onMainEvents() {
     }
     if (ev.type === 'moon') {
       const nowB = sampleBodies(S, S.t), mo = bodyById(nowB, ev.id), p = bodyById(nowB, ev.from);   // both at the same instant
-      const mtext = 'Far from the suns again, the debris has gathered into a moon' + (mo && p ? ', ' + fmtDist(Math.hypot(mo.x - p.x, mo.y - p.y)) + ' out' : '') + '.';
+      const mtext = 'Far from the ' + sunsWord(sunCount(nowB)) + ' again, the debris has gathered into a moon' + (mo && p ? ', ' + fmtDist(Math.hypot(mo.x - p.x, mo.y - p.y)) + ' out' : '') + '.';
       say('moon' + world.evSeen, mtext, false, { urgent: true }); if (c && ev.from === c.id) chronicle('moon', mtext);
       slowFor(3000, 0.1);
       continue;
@@ -1717,12 +1842,12 @@ function onMainEvents() {
     const small = la && lb ? (la.m <= lb.m ? la : lb) : null, big = small === la ? lb : la;
     let text;
     if (small && isWorld(small) && !isWorld(big)) {
-      text = (small.kind === 'planet' ? 'The planet' : 'The moon') + (isStar(big.m) ? ' has fallen into sun ' + labelOf(big) + '.' : ' has crashed into ' + nameOf(big) + '.');
+      text = (small.kind === 'planet' ? capName(small) : 'The moon') + (isStar(big.m) ? ' has fallen into ' + nameOf(big) + '.' : ' has crashed into ' + nameOf(big) + '.');
       if (c && small.id === c.id) { c.over = true; c.endT = S.t; text += ' ' + civCount(); chronicle('end', text); refreshCivOut(); }
     } else if (small && isWorld(small) && isWorld(big)) {
       text = killCiv('The moon has fallen back onto the planet.'); chronicle('moon', text);
     } else {
-      const A = la ? labelOf(la) : LETTERS[ev.a] || '?', B = lb ? labelOf(lb) : LETTERS[ev.b] || '?';
+      const A = la ? capName(la) : LETTERS[ev.a] || '?', B = lb ? nameOf(lb) : LETTERS[ev.b] || '?';
       text = A + ' and ' + B + ' have collided and merged into one body. Its mass and momentum are the sum of theirs.' + (S.n === 2 ? ' With two bodies left, the rest is predictable.' : '');
     }
     say('merge' + world.evSeen, text, false, { urgent: true });
@@ -1746,12 +1871,12 @@ function watch() {
       if (c && fb.id === c.id) {
         c.exiled = true;
         const com = centerOfMass(b.filter(q => q !== fb)), v = Math.hypot(fb.vx - com[2], fb.vy - com[3]) * V_KMS;
-        const etext = 'The planet is leaving its suns for good, at ' + sig(v, 2) + ' km/s into the dark.' + (c.alive ? ' Civilization ' + c.n + ' will be the last.' : c.n ? ' No civilization will follow.' : '');
+        const etext = 'The planet is leaving its ' + sunsWord(sunCount(b)) + ' for good, at ' + sig(v, 2) + ' km/s into the dark.' + (c.alive ? ' Civilization ' + c.n + ' will be the last.' : c.n ? ' No civilization will follow.' : '');
         say('exile', etext, false, U); chronicle('end', etext);
       } else if (fb.kind === 'moon') say('escape' + e, 'The moon has been pulled away for good.', false, U);
       else if (world.escaped.size >= n && n >= 3) continue;
       else if (stock && COPY[id].escape) say('escape', COPY[id].escape, false, U);
-      else say('escape' + e, (isStar(fb.m) ? 'Sun ' : '') + labelOf(fb) + ' is leaving for good. It is now moving too fast for the others’ gravity to pull it back.', false, U);
+      else say('escape' + e, capName(fb) + ' is leaving for good. It is now moving too fast for the others’ gravity to pull it back.', false, U);
     }
   }
   if (stock && id === 'triangle' && n === 3 && !world.flags.toppled) {
@@ -1773,7 +1898,7 @@ function snapshot() {
   return {
     pi: world.pi, sky: world.sky, edited: world.edited, ic: cloneBodies(world.ic), sys: world.sys.clone(),
     t: world.t, trails: snapTrails(world.trails), escaped: new Set(world.escaped), evSeen: world.evSeen,
-    R0: world.R0, vRef: world.vRef, arrowK: world.arrowK, com0: world.com0.slice(), sel: world.sel, dirMemo: Object.assign({}, world.dirMemo),
+    R0: world.R0, S0: world.S0, vRef: world.vRef, arrowK: world.arrowK, com0: world.com0.slice(), sel: world.sel, dirMemo: Object.assign({}, world.dirMemo),
     flags: Object.assign({}, world.flags), flyMin: world.flyMin, said: new Set(insight.said), caption: insight.text, portrait: world.portrait,
     frameBox: world.frameBox, civ: cloneCiv(world.civ),
   };
@@ -1788,7 +1913,7 @@ function undo() {
   world.playing = false;
   world.pi = s.pi; world.preset = PRESETS[s.pi]; world.sky = s.sky || SKY_LIST[0]; world.edited = s.edited; world.ic = s.ic; world.sys = s.sys;
   world.t = s.t; restoreTrails(world.trails, s.trails);
-  world.escaped = s.escaped; world.evSeen = s.evSeen; world.R0 = s.R0; world.vRef = s.vRef; world.arrowK = s.arrowK; world.com0 = s.com0;
+  world.escaped = s.escaped; world.evSeen = s.evSeen; world.R0 = s.R0; world.S0 = s.S0 || s.R0; world.vRef = s.vRef; world.arrowK = s.arrowK; world.com0 = s.com0;
   world.sel = s.sel; world.dirMemo = s.dirMemo;
   world.flags = s.flags; world.flyMin = s.flyMin; insight.said = s.said; world.portrait = s.portrait;
   world.frameBox = s.frameBox; resetVisuals(); world.civ = s.civ; refreshCivOut();
@@ -1942,7 +2067,8 @@ function computeForecast(quick) {
   if (!quick) {
     const c = centerOfMass(start), lim = 2.4 * (maxSeparation(start) || 1);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    paths.forEach(p => { for (let i = 0; i < p.length; i += 2) {
+    const fr = world.preset.frame;         // a hierarchical system's box follows its near sun and worlds only
+    paths.forEach((p, id) => { if (fr && !fr.includes(id)) return; for (let i = 0; i < p.length; i += 2) {
       const x = clamp(p[i], c[0] - lim, c[0] + lim), y = clamp(p[i + 1], c[1] - lim, c[1] + lim);
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } });
     world.frameBox = { x0, x1, y0, y1, until: world.t + Math.min(horizon, S.t) };
@@ -2010,9 +2136,13 @@ function updateVisuals(dt, simulationDt = 0) {
   for (const id of visuals.climates.keys()) if (!live.has(id)) visuals.climates.delete(id);
   if (eventEffects) eventEffects.update(dt, { playing: running, reducedMotion });
 }
+const TONE_NAMES = ['amber', 'cyan', 'coral'];
+const toneOfBody = b => (b.meta && b.meta.tone) || TONE_NAMES[b.id % 3];   // a real sun names its tone; the classics colour by id
+const toneIdx = b => TONE_NAMES.indexOf(toneOfBody(b));
 function colorOf(b, list) {
   if (b.kind === 'moon') return theme.moon;
   if (b.kind === 'planet') return worldColor(tempOf(b, list || world.cur));
+  if (isStar(b.m)) return theme.body[toneIdx(b)];
   return theme.body[b.id] || theme.moon;
 }
 function colorById(id, list) { const b = bodyById(list, id); return b ? colorOf(b, list) : (theme.body[id] || theme.moon); }
@@ -2091,6 +2221,8 @@ function setAuto(on) {
 function fitPoints() {                    // everything worth keeping in view: bodies that have not escaped, their recent trails, the path ahead
   const pts = [];
   let tracked = world.cur.filter(b => !world.escaped.has(b.id));
+  const fr = world.preset.frame;           // a hierarchical system frames its near sun and worlds; the far suns sit past the edge markers
+  if (fr) { const near = tracked.filter(b => fr.includes(b.id)); if (near.length) tracked = near; }
   if (!tracked.length) tracked = world.cur;
   const tMin = world.t - world.preset.trail;
   for (const b of tracked) {
@@ -2106,7 +2238,7 @@ function fitTarget() {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (const [x, y] of fitPoints()) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   const s = view.safe, pad = world.playing ? 34 : 46;
-  const minHalf = 0.2 * world.R0;
+  const minHalf = 0.2 * world.S0;
   const hw = Math.max((x1 - x0) / 2, minHalf), hh = Math.max((y1 - y0) / 2, minHalf);
   const aw = Math.max(60, s.r - s.l - 2 * pad), ah = Math.max(60, s.b - s.t - 2 * pad);
   return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, scale: Math.min(aw / (2 * hw), ah / (2 * hh)) };
@@ -2131,10 +2263,10 @@ function updateCamera(dt) {
       else {
         follow = [b.x, b.y];
         let near = Infinity; for (const q of world.cur) if (q !== b) near = Math.min(near, Math.hypot(q.x - b.x, q.y - b.y));
-        followDefault = clamp(isFinite(near) ? 2.6 * near : world.R0, 0.08 * world.R0, 1.5 * world.R0);
+        followDefault = clamp(isFinite(near) ? 2.6 * near : world.S0, 0.08 * world.S0, 1.5 * world.S0);
       }
     }
-    const moved = sky3d.api.updateCamera({ dt, points: rig.mode === 'overview' ? fitPoints() : null, follow, followDefault, minHalf: 0.2 * world.R0,
+    const moved = sky3d.api.updateCamera({ dt, points: rig.mode === 'overview' ? fitPoints() : null, follow, followDefault, minHalf: 0.2 * world.S0,
       safe: view.safe, pad: world.playing ? 34 : 46, playing: world.playing && !document.hidden, reduced: reducedMotion, hold: holding });
     if (moved) invalidate(200);
     return;
@@ -2157,9 +2289,10 @@ function updateCamera(dt) {
   cam.scale = Math.exp(ls + (lt - ls) * kz + Math.min(0, cam.vs) * dt);
   cam.x += cam.vx * dt + (T.x - cam.x) * kp; cam.y += cam.vy * dt + (T.y - cam.y) * kp;
   /* whatever the easing does, a body that is being followed never leaves the clear area */
-  const hx = Math.max(30, (s.r - s.l) / 2 - 20), hy = Math.max(30, (s.b - s.t) / 2 - 20);
+  const hx = Math.max(30, (s.r - s.l) / 2 - 20), hy = Math.max(30, (s.b - s.t) / 2 - 20), fr = world.preset.frame;
   for (const b of world.cur) {
     if (world.escaped.has(b.id) && world.escaped.size < world.cur.length) continue;
+    if (fr && !fr.includes(b.id)) continue;   // a hierarchical system's far suns stay past the edge markers
     const dx = Math.abs(b.x - cam.x) * cam.scale, dy = Math.abs(b.y - cam.y) * cam.scale;
     if (dx > hx) cam.scale *= hx / dx;
     if (dy * (dx > hx ? hx / dx : 1) > hy) cam.scale *= hy / (dy * (dx > hx ? hx / dx : 1));
@@ -2261,7 +2394,7 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
   drawn.clear();
   const b = world.cur, n = b.length, k = reducedMotion ? 1 : 1 - Math.exp(-dt * 14);
   /* In 3D a close look should show more of a body: sizes grow gently past the scale at which the whole setup fills the view. */
-  const gainWant = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.R0 / view.h, 0.6), 1, 10) : 1;
+  const gainWant = sky3d.on ? clamp(Math.pow(scaleNow() * 2.6 * world.S0 / view.h, 0.6), 1, 10) : 1;
   gain3d += (gainWant - gain3d) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3));
   const gain = gain3d;
   for (let i = 0; i < n; i++) {
@@ -2285,18 +2418,27 @@ function layoutBodies(dt) {               // screen positions and drawn sizes; d
     drawn.set(id, { x: X, y: Y, r: Math.max(1.7, R * shrink[id]), R, nx, ny, nd: best, s: S });
   }
 }
+/* A tidally locked world keeps one face to the sun that holds it: its surface phase follows the direction to that sun
+ * instead of the clock. 24 is the flat renderer's planet period in seconds per turn, so a full circle is one turn. */
+function lockedSpin(q, list) {
+  const { shares } = fluxOn(list, q); let host = null, bf = 0;
+  for (const [s, f] of shares) if (f > bf) { bf = f; host = s; }
+  if (!host) return visuals.spinTime;
+  const a = Math.atan2(host.y - q.y, host.x - q.x);
+  return 24 * (((a / (2 * Math.PI)) % 1 + 1) % 1);
+}
 function drawBodies(paused) {
   const b = world.cur;
   ctx.globalCompositeOperation = theme.additive ? 'lighter' : 'source-over';
-  for (const q of b) { if (isWorld(q) || !isStar(q.m) || !theme.glow[q.id]) continue; const d = drawn.get(q.id), g = d.r * 3.4; ctx.drawImage(theme.glow[q.id], d.x - g, d.y - g, 2 * g, 2 * g); }
+  for (const q of b) { if (isWorld(q) || !isStar(q.m)) continue; const d = drawn.get(q.id), g = d.r * 3.4; ctx.drawImage(theme.glow[toneIdx(q)], d.x - g, d.y - g, 2 * g, 2 * g); }
   ctx.globalCompositeOperation = 'source-over';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const q of b) {
     const d = drawn.get(q.id), col = colorOf(q), lab = labelOf(q);
     ctx.fillStyle = rgba(col, 1); ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI); ctx.fill();
     if (bodyRenderer && d.r >= 2.2) {
-      const common = { x: d.x, y: d.y, r: d.r, theme: theme.additive ? 'dark' : 'light', bodyId: q.id, time: visuals.time, spinTime: visuals.spinTime, quality: perf.quality, reducedMotion };
-      if (isStar(q.m) && !isWorld(q)) bodyRenderer.drawStar(ctx, { ...common, id: ['amber', 'cyan', 'coral'][q.id % 3] });
+      const common = { x: d.x, y: d.y, r: d.r, theme: theme.additive ? 'dark' : 'light', bodyId: q.id, time: visuals.time, spinTime: q.meta && q.meta.locked ? lockedSpin(q, b) : visuals.spinTime, quality: perf.quality, reducedMotion };
+      if (isStar(q.m) && !isWorld(q)) bodyRenderer.drawStar(ctx, { ...common, id: toneOfBody(q) });
       else bodyRenderer.drawWorld(ctx, { ...common, climate: visuals.climates.get(q.id) ?? climateTexture(tempOf(q, b)), moon: q.kind === 'moon', ripped: q.ripped && q.kind !== 'moon', detail: theme.additive ? 0.72 : 0.62 });
     }
     ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
@@ -2476,6 +2618,10 @@ function thumbPaths(p) {
       for (let i = 0; i < n; i++) { const q = paths[i], L = q.length, dx = tmp[4 * i] - q[L - 2], dy = tmp[4 * i + 1] - q[L - 1]; if (dx * dx + dy * dy >= min2) q.push(tmp[4 * i], tmp[4 * i + 1]); }
     }
   }
+  if (p.frame) {                           // a hierarchical system's thumbnail shows the near sun and its worlds
+    const keep = b.map(q => p.frame.includes(q.id)), start = b.filter((_, i) => keep[i]);
+    return (thumbData[p.id] = { paths: paths.filter((_, i) => keep[i]), R0: maxSeparation(start) || R0, start });
+  }
   return (thumbData[p.id] = { paths, R0, start: b });
 }
 function drawThumb(cv, p) {
@@ -2538,7 +2684,7 @@ function drawBodyChip(cv, b) {
   // Reuse the game's cached surfaces. Inspector thumbnails stay still while
   // their climate follows the world, without adding another animation loop.
   const spec = { x: 20, y: 20, r: 16, bodyId: 'chip-' + b.id, time: 0, spinTime: 0, reducedMotion: true, theme: theme.additive ? 'dark' : 'light' };
-  if (star) bodyRenderer.drawStar(k, { ...spec, id: ['amber', 'cyan', 'coral'][b.id % 3] });
+  if (star) bodyRenderer.drawStar(k, { ...spec, id: toneOfBody(b) });
   else bodyRenderer.drawWorld(k, { ...spec, climate, moon, ripped: b.ripped && !moon, detail: theme.additive ? .72 : .62 });
 }
 function refreshBodies(force) {
@@ -2559,7 +2705,7 @@ function refreshBodies(force) {
   }
   for (const btn of dom.bodyChips.children) {
     const b = bodyById(list, +btn.dataset.id); if (!b) continue;
-    const name = isWorld(b) ? (b.kind === 'moon' ? 'Moon' : 'Planet') : (isStar(b.m) ? 'Sun ' : 'Planet ') + labelOf(b);
+    const name = b.meta && b.meta.name ? capName(b) : isWorld(b) ? (b.kind === 'moon' ? 'Moon' : 'Planet') : (isStar(b.m) ? 'Sun ' : 'Planet ') + labelOf(b);
     const [mass, unit] = fmtMass(b.m).split(' × ');
     btn.setAttribute('aria-pressed', String(b.id === world.sel));
     btn.setAttribute('aria-label', name + ', ' + fmtMass(b.m));
@@ -2583,7 +2729,7 @@ function refreshBodies(force) {
   dom.dVal.textContent = deg + '°';
   dom.dirIcon.style.transform = 'rotate(' + (-deg) + 'deg)';
 }
-const posStep = () => nice125(world.R0 / 40);
+const posStep = () => nice125(world.S0 / 40);
 const velStep = () => nice125(world.vRef * V_KMS / 24) / V_KMS;
 function stepField(kind, dir) {
   if (!bodyById(world.cur, world.sel)) return;
@@ -2877,6 +3023,7 @@ function renderScience() {
     + '<li><strong>Sizes.</strong> Bodies are drawn thousands of times too large so that you can see them. When two come close on screen, their discs shrink rather than hide each other.</li>'
     + '<li><strong>Collisions.</strong> Each star is treated as a compact ball. A 1-Sun body is about 15,000 km in radius here, roughly twice the size of a white dwarf star and nearly 50 times smaller than the real Sun. Two bodies that touch merge into one. Mass and momentum are kept, and the energy of the crash is assumed to leave as heat. There is no relativity and no loss of mass.</li>'
     + '<li><strong>Worlds.</strong> A body lighter than 0.05 Suns is a world rather than a star, and worlds meet stars at their real sizes: a planet is swallowed when it reaches a star’s true surface. Closer than about 1.5 times that, inside what astronomers call the Roche limit, a star’s tides tear a world apart. Here a tenth of it is lost as debris, which gathers into a moon once the world is far enough from the stars for the moon to hold. A world’s temperature is what it receives from every sun, with a star’s brightness rising steeply with its mass and falling with the square of distance, smoothed over about three months as oceans and air would do. The civilizations are a story told on top of the physics: one begins after a year of calm, and ends when the planet leaves the range from about −38 °C to 47 °C, or when the planet itself is torn, swallowed or thrown out.</li>'
+    + '<li><strong>Real systems.</strong> The one-, two- and three-sun systems use published masses, brightnesses and orbits, cited in each system’s notes. A sun that carries a measured brightness shines by it instead of the mass rule, and a world so close to its sun that the tides have locked it keeps one face to that sun. Where no planet is known, as at Alpha Centauri, a placed world is labelled as such. Distant companions that cannot move the planet are left out or, at Gliese 667, kept 230 AU away beyond the edge of the view.</li>'
     + '<li><strong>Escapes.</strong> A body counts as leaving when it is far from the others, moving away, and too fast for their gravity ever to bring it back. The view then stays with whoever remains, and a marker at the edge shows which way the escaper went.</li>'
     + '</ul>');
   h += fold(SCI.how[0],

@@ -1,6 +1,23 @@
 # Three-Body
 
-An interactive gravitational learning experience: explore orbital setups and follow a planet under three suns. The simulation runs in the browser; the server only delivers static files.
+An interactive gravitational learning experience: explore orbital setups and follow a world that could support life under one, two or three suns. The simulation runs in the browser; the server only delivers static files.
+
+## Systems
+
+The preset menu is grouped by how many suns a world lives under. Every system below uses published masses, brightnesses and orbits (cited in each system's notes on the page), and the page follows one world in each: its temperature is computed from the light it receives, and the civilization story, eras and history run on top exactly as they do for Trisolaris.
+
+| Group | System | Followed world | What it shows |
+|---|---|---|---|
+| One sun | Sun, Earth and Jupiter | Earth | Home at true scale; Jupiter's pull is a whisper |
+| One sun | TRAPPIST-1 | e | Seven tidally locked worlds in 1.5 to 19 day orbits round an ultracool dwarf |
+| One sun | Proxima Centauri | b | The nearest star's Earth-mass world, 11 days round a flaring red dwarf |
+| One sun | Kepler-442 | b | A rocky world in the warm zone, far enough out to keep a day and night |
+| Two suns | Alpha Centauri | a placed Earth-mass world 0.7 AU from B | S-type stability; A's closest pass every 80 years |
+| Two suns | Kepler-47 | c | Three real planets circling a 7-day binary; c in the habitable zone |
+| Three suns | Trisolaris | the planet | The novel's chaotic world, with seeded skies |
+| Three suns | Gliese 667 | Cc | A real three-sun sky: C warms the world, A and B are scenery 230 AU away |
+
+A body may carry metadata the integrator never reads: a name and label, a sun's tone and measured brightness (used instead of the mass rule), whether a world is tidally locked (it then keeps one face to the sun that lights it, in both views), and which world the page follows. The Classics group keeps the mathematical setups (Figure-eight, Moth, Lagrange's triangle, the slingshot and the rest) unchanged. `Gliese 667` frames its near sun and worlds and leaves A and B past the edge markers, since at 230 AU they add a few millionths of the planet's warmth.
 
 ## Run locally
 

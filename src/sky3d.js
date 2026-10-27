@@ -7,7 +7,8 @@ import { LineSegmentsGeometry } from '../vendor/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/LineMaterial.js';
 import { CameraRig, cameraOffset, climateTint, atmosphereTint, spinAngle, SPIN_PERIODS, STAR_PHASE, toneOf, clamp, TAU } from './sky3d-model.js';
 
-const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200, LUM = m => Math.pow(m, 3.5);
+const FOV = 42, GLOW_SCALE = 7.5, SEG_CAP = 2200;
+const LUM = b => (b.meta && b.meta.lum != null ? b.meta.lum : Math.pow(b.m, 3.5));   // a published brightness when the body carries one
 const SIZE_GAIN = { star: 1, planet: 1.3, moon: 1.25, giant: 1.15 };   // worlds are a few pixels across; a sphere needs a little more than a disc to read
 const assetRoot = new URL('../assets/bodies/', import.meta.url);
 
@@ -125,7 +126,7 @@ export function createSky3D({ canvas }) {
     lineMaterials.add(material);
     const line = new LineSegments2(geometry, material); line.frustumCulled = false; line.renderOrder = -1;
     scene.add(group, line);
-    return { kind, group, mesh, glow, light, atmo, line, geometry, material, tone: kind === 'star' ? toneOf(b.id) : kind, trailAt: -1, trailMode: '' };
+    return { kind, group, mesh, glow, light, atmo, line, geometry, material, tone: kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind, trailAt: -1, trailMode: '' };
   }
   function dropActor(id) {
     const a = actors.get(id); if (!a) return;
@@ -217,23 +218,30 @@ export function createSky3D({ canvas }) {
     const { bodies, drawn, trails, trailMode, tNow, tMin, climates, spinTime, quality, colorOf } = frame;
     const live = new Set();
     let brightest = null, bright = 0;
-    for (const b of bodies) if (kindOf(b) === 'star') { const L = LUM(b.m); if (L > bright) { bright = L; brightest = b; } }
+    for (const b of bodies) if (kindOf(b) === 'star') { const L = LUM(b); if (L > bright) { bright = L; brightest = b; } }
     for (const b of bodies) {
       live.add(b.id);
       const rgb = colorOf(b), d = drawn.get(b.id);
       let a = actors.get(b.id);
+      const kind = kindOf(b), tone = kind === 'star' ? ((b.meta && b.meta.tone) || toneOf(b.id)) : kind;
+      if (a && (a.kind !== kind || a.tone !== tone)) { dropActor(b.id); a = null; }   // the same id is another body after a setup change
       if (!a) { a = makeActor(b, rgb); actors.set(b.id, a); }
       const s = d && d.s ? d.s : pxPerWorld, r = (d ? d.r : 8) * SIZE_GAIN[a.kind] / s;
       a.group.position.set(b.x, 0, -b.y);
       a.mesh.scale.setScalar(r);
       a.mesh.rotation.y = spinAngle(spinTime, SPIN_PERIODS[a.tone]) + (a.kind === 'star' ? STAR_PHASE[a.tone] : 0);
+      if (b.meta && b.meta.locked) {        // tidally locked: one face stays toward the sun that lights it most
+        let host = null, bf = 0;
+        for (const q of bodies) if (q !== b && kindOf(q) === 'star') { const f = LUM(q) / ((q.x - b.x) ** 2 + (q.y - b.y) ** 2); if (f > bf) { bf = f; host = q; } }
+        if (host) a.mesh.rotation.y = Math.atan2(host.y - b.y, host.x - b.x);
+      }
       a.mesh.visible = quality < 3;
       if (a.kind === 'star') {
         tmpColor.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace);
         a.mesh.material.emissive.copy(tmpColor).multiplyScalar(1.15);
         a.glow.material.color.copy(tmpColor); a.glow.material.opacity = additive ? 0.85 : 0.38; a.glow.material.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
         a.glow.scale.setScalar(r * GLOW_SCALE);
-        a.light.color.copy(tmpColor); a.light.intensity = (additive ? 4.8 : 6) * LUM(b.m);
+        a.light.color.copy(tmpColor); a.light.intensity = (additive ? 4.8 : 6) * LUM(b);
       } else if (a.kind === 'planet' || a.kind === 'moon') {
         const c = climates ? (climates.get(b.id) ?? 2) : 2, tint = climateTint(c), u = a.mesh.material.userData;
         u.tint.value.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]); u.amount.value = tint.amount;
