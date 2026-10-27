@@ -1,0 +1,581 @@
+{
+  "tool": "Built-in image_gen; model/version and seed not exposed",
+  "assetSet": "body-assets-v6",
+  "brief": "BRIEF.md",
+  "scope": "Ground texture PNG masters only. Application integration and shipping compression are handled separately.",
+  "reproducibility": "Exact prompts, references and raw outputs are preserved. The generator exposes no seed or model version, so prompts do not guarantee identical regeneration. Finishing scripts deterministically reproduce the delivered masters from the retained raws.",
+  "nativeResolution": "Six generated albedos were returned at 1254×1254, then resampled with Lanczos3 to 2048×2048. This adds no native detail. The seventh asset is a 2048×2048 mask derived from the final lava albedo.",
+  "outputFormat": "Opaque RGB8 PNG with embedded sRGB profile; opposite edge pixels match exactly on both axes.",
+  "finishingScripts": [
+    "finish-shores.mjs",
+    "finish-ice-hardpan.mjs",
+    "finish-lava.mjs"
+  ],
+  "preview": "review/contact-sheet.png",
+  "independentAudit": "review/independent-audit.json",
+  "compressionEstimates": {
+    "settings": "sharp Lanczos3 512×512; WebP effort 6; buffers only, no shipping files written",
+    "assets": {
+      "ground-ice-margin.png": {
+        "qualityToBytes": {
+          "66": 79576,
+          "74": 86392,
+          "76": 90404,
+          "78": 94466
+        },
+        "suggestedQuality": 66,
+        "suggestedBytes": 79576
+      },
+      "ground-shore.png": {
+        "qualityToBytes": {
+          "74": 67734,
+          "76": 71570,
+          "78": 76534
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 71570
+      },
+      "ground-blue-ice.png": {
+        "qualityToBytes": {
+          "74": 48870,
+          "76": 51550,
+          "78": 57220
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 51550
+      },
+      "ground-ice-lineae.png": {
+        "qualityToBytes": {
+          "74": 43960,
+          "76": 46754,
+          "78": 52064
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 46754
+      },
+      "ground-hardpan.png": {
+        "qualityToBytes": {
+          "74": 74328,
+          "76": 77952,
+          "78": 84660
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 77952
+      },
+      "ground-lava.png": {
+        "qualityToBytes": {
+          "74": 46662,
+          "76": 48610,
+          "78": 52946
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 48610
+      },
+      "ground-lava-glow.png": {
+        "qualityToBytes": {
+          "74": 33416,
+          "76": 34442,
+          "78": 36556
+        },
+        "suggestedQuality": 78,
+        "suggestedBytes": 36556
+      }
+    },
+    "suggestedTotalBytes": 412568,
+    "quality78TotalBytes": 454446,
+    "note": "Sizing guidance for the integration agent. Recheck decoded lossy-WebP seams and the visual result in the renderer. PNG masters remain unchanged."
+  },
+  "assets": {
+    "ground-ice-margin.png": {
+      "prompt": "Use case: precise-object-edit. Asset type: seamless square ground albedo tile, opaque PNG.\nEdit the supplied broken-ice shore texture. Retain its exact muted colour palette, quiet painterly finish, approximately same material coverage and flat unlit look. Change only the SCALE and DISTRIBUTION of its features: zoom out to cover THREE TIMES as much ground along each axis. Each ice slab and puddle needs to be about one-third its current width, with far more varied independently shaped fragments across the square. Maximum individual ice slab width 3 percent of the full canvas (about38px in a1254px image). Show around200 small irregular icechips and many small branching puddles, with tiny gravel and sparse dark olive crust. No new large slabs, rocks or open water areas.\nDo not make a grid or mechanically repeat the source image. Recompose the material seamlessly with organic irregular variation in all directions, matching both opposite edge pairs. Keep diffuse albedo only: no new shadows, reflections, glints, lighting, gloss or bloom; no horizon, perspective, objects, leaves or stems. Full bleed square2048x2048requested, 8bitRGBsRGBopaque.",
+      "reference": "raw/ground-ice-margin-v1.png",
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-33d4e1fc-2a69-4f64-9db3-0d491a2c4d42.png",
+      "raw": "raw/ground-ice-margin.png",
+      "generationHistory": [
+        {
+          "prompt": "Use case: stylized-concept.\nAsset type: production game ground ALBEDO texture, a single full-bleed square tile. Requested output 2048 x 2048, opaque 8-bit sRGB PNG.\nStyle: quiet painterly and natural, softened fine material detail, restrained contrast, believable muted colour; match softly painted natural game terrain, never neon, cartoonish, photographic or hyper-sharp noisy detail.\nComposition: strict orthographic straight-down view, no perspective or horizon. Uniformly distributed small features, no isolated landmark. Every individual rock, ice fragment or distinct pool is only 1–4 percent of tile width; many small organic patches. No strong single direction, only gentle large-scale value variation. Both opposite edge pairs must join seamlessly, left-right and top-bottom. Fill the entire square with material, no margins.\nLighting: completely flat UNLIT diffuse material colour. No cast shadows, directional shading, reflected sky, specular highlights, sun glitter, shine, glow, vignette or gradients of illumination. Even wet water and ice must be matte painted colour. No text, labels, grid, border, frame or watermark. This same texture covers low hill faces as well as level ground, so use small pools and channels rather than one broad continuous horizontal water sheet.\nSubject: a cold, broken-ice shoreline at the habitable margin of a tidally locked eyeball planet. Dark wet cool grey gravel and many small stones throughout, interspersed with shallow muted blue-teal meltwater puddles and fine branching rivulets. Numerous scattered small angular slabs and rafts of broken grey-white ice with slushy granular edges, varied irregular orientations. Ice is naturally fractured, not snow dunes. Some sheltered tiny hollows hold very sparse LOW crustlike patches in very dark olive and umber. This is a dim cool palette, not lighting. Approximate distribution: 45% gravel/stone, 25% pools/rivulets, 28% broken ice/slush, 2% mosslike crust. Terrain is a balanced fine-grained irregular mosaic across the whole tile, with little clustered ice chips and small connected puddles; no central focal object. Soft weathered white, blue-grey, dark slate, subdued desaturated teal, tiny dark olive-brown crust. No grass, no visible leaves, stems, trees, lush greenery, large boulders or beach horizon. Keep all features small so repeating the tile is unobtrusive.",
+          "reference": null,
+          "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-1f865656-ee79-4d98-ab0e-9c60f651ccb0.png"
+        }
+      ],
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "processing": {
+        "resample": "Lanczos3 1254x1254 to 2048x2048",
+        "seamCorrection": "Pair opposing pixels toward their mean, smoothstep taper across 4% edge strips; horizontal then vertical",
+        "output": "Opaque RGB8 PNG with sRGB ICC"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "nativeSize": [
+          1254,
+          1254
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgb": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "estimated512WebPBytes": {
+          "74": 88024,
+          "76": 91576,
+          "78": 95570
+        },
+        "sha256": "2eb9235ae7f7d4c588a940d140b0918381845240bd3a73be0d6683dfa3f3ac22"
+      },
+      "file": "images/ground-ice-margin.png",
+      "sourceManifest": "prompts-shores.json",
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "66": 79576,
+          "74": 86392,
+          "76": 90404,
+          "78": 94466
+        },
+        "suggestedQuality": 66,
+        "suggestedBytes": 79576
+      },
+      "sha256": "2eb9235ae7f7d4c588a940d140b0918381845240bd3a73be0d6683dfa3f3ac22"
+    },
+    "ground-shore.png": {
+      "prompt": "Use case: precise-object-edit. Input is an edit target: an existing square tiled ground albedo texture.\nKeep the same small feature scale, muted painterly style, colours and overall organic random distribution. Correct ONE thing: the current turquoise water covers only about22percent. INCREASE WATER COVERAGE to HALF THE ENTIRE CANVAS (target50–55percent), by widening the numerous tiny pools and branching channels and shrinking the sandbanks between them. The turquoise water should visibly occupy as much area as all the beige and dark sandbanks combined. Distribute added water everywhere uniformly; do not create one big lake or a single wide river. Keep plenty of small sandbars, little pebblebanks and isolated stoneledges as islands between the water. Individual pools and channels must still be only a few percent of canvas width, but many can connect locally.\nWater must be matte unlit muted turquoise-to-teal pigment, no reflection or shine. Thin broken foam traces only along some banks. Keep grey pebbles tiny and scattered; do not replace this with a beach photograph.\nFull-bleed square opaque8bit sRGB PNG requested2048x2048. Exact seamless wrapping bothways. No directional light, sun glitter, cast shadows, caustics, highlights, glow, vignette, waves, perspective, horizon, sky, plants, text or border.",
+      "reference": "raw/ground-shore-v2.png",
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-192d4755-bcea-48fd-a3bf-44b25acd465e.png",
+      "raw": "raw/ground-shore.png",
+      "generationHistory": [
+        {
+          "prompt": "Use case: stylized-concept.\nAsset type: production game ground ALBEDO texture, a single full-bleed square tile. Requested output 2048 x 2048, opaque 8-bit sRGB PNG.\nStyle: quiet painterly and natural, softened fine material detail, restrained contrast, believable muted colour; match softly painted natural game terrain, never neon, cartoonish, photographic or hyper-sharp noisy detail.\nComposition: strict orthographic straight-down view, no perspective or horizon. Uniformly distributed small features, no isolated landmark. Every individual rock, ice fragment or distinct pool is only 1–4 percent of tile width; many small organic patches. No strong single direction, only gentle large-scale value variation. Both opposite edge pairs must join seamlessly, left-right and top-bottom. Fill the entire square with material, no margins.\nLighting: completely flat UNLIT diffuse material colour. No cast shadows, directional shading, reflected sky, specular highlights, sun glitter, shine, glow, vignette or gradients of illumination. Even wet water and ice must be matte painted colour. No text, labels, grid, border, frame or watermark. This same texture covers low hill faces as well as level ground, so use small pools and channels rather than one broad continuous horizontal water sheet.\nSubject: tidal flats on an ocean world. About half the tile is SMALL irregular shallow-water pools and narrow branching channels, clear subdued turquoise over pale sand, transitioning locally into deeper muted teal. The other half is banks of wet dark grey-brown sand, pale dry buff sand, scattered very low dark rock ledges and tiny pebble patches. Thin BROKEN white foam traces along SOME water edges; little scattered drifted foam patches painted flat on the pools. Water is opaque matte flat colour with subtle sediment variation, NO reflection, wave, sun glitter or caustic lighting. Many small disconnected pools and irregular branching channels across entire canvas in different orientations, not a river or one coastline crossing the tile. Fine spatial scale like ground regolith: hundreds of tiny stones and dozens of little irregular pools, each pool ideally 2–4 percent of canvas width. Natural softly painted terrain; low contrast transitions except occasional broken foam. No large shells or seaweed, no vegetation, no large rocks, no beach scene or sea horizon. Palette ties to teal ocean-world continental shelves.",
+          "reference": null,
+          "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-6791d2b5-d790-4ab7-a9aa-09a1ae70ccba.png"
+        },
+        {
+          "prompt": "Use case: precise-object-edit. Asset type: production game seamless square albedo tile, opaque8-bitRGBsRGBPNG, requested2048x2048.\nEdit the supplied tidal-flat texture. Preserve its restrained turquoise/teal water, buff sand, dark wet banks, quiet painterly material colours, approximately50percentwater coverage and flat unlit character. Change only scale and distribution: show THREE TIMES the ground area per axis, shrinking all the recognizable pools/rockledges to roughly one-third current width and greatly increasing the number of independently shaped small pools and channels across the whole image. Individual pools should occupy only2–4percent of image width, each small stone far below1percent. No prominent large central pool or long single river/coastline.\nThis is NOT mechanical tiling of the source; create varied organic material distribution, no grid/repeatedstamp pattern. Many small irregular water patches connected locally by narrow rivulets in all directions, diffuse palebuffsand islets and small pebblebanks. Keep white foam thin and broken, no foamy circles around every pool. All water stays in small pools/channels so material also works on hill faces.\nMatch opposite edges seamlessly in both directions. Full bleed, straightdown orthographic, flat unlit diffuse albedo: NO new shadows, waves, specular glints, reflections, sun glitter, caustics, shine, glow, lighting gradients, perspective, horizon, vegetation, text, frame or watermark.",
+          "reference": "raw/ground-shore-v1.png",
+          "source": "/Users/mat/.codex/generated_images/01a0ce9e-3b18-7602-91d4-13d7c6db1f91/exec-43d2c444-98fc-4911-8f6c-9cfaab70cf57.png",
+          "file": "raw/ground-shore-v2.png"
+        }
+      ],
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "processing": {
+        "resample": "Lanczos3 1254x1254 to 2048x2048",
+        "seamCorrection": "Pair opposing pixels toward their mean, smoothstep taper across 4% edge strips; horizontal then vertical",
+        "output": "Opaque RGB8 PNG with sRGB ICC"
+      },
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "nativeSize": [
+          1254,
+          1254
+        ],
+        "bitDepth": 8,
+        "colourspace": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "embeddedSrgb": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "estimated512WebPBytes": {
+          "74": 71512,
+          "76": 75000,
+          "78": 79400
+        },
+        "sha256": "fc5ef86d15c3c06773e7c6de240c8a8b6e196a5797ae64d34115d98d90b6c946",
+        "waterColourCoverage": 0.5102205276489258,
+        "waterCriterion": "G>R+5 and B>R-5, an approximate colour coverage check, not semantic segmentation"
+      },
+      "file": "images/ground-shore.png",
+      "sourceManifest": "prompts-shores.json",
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "74": 67734,
+          "76": 71570,
+          "78": 76534
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 71570
+      },
+      "sha256": "fc5ef86d15c3c06773e7c6de240c8a8b6e196a5797ae64d34115d98d90b6c946"
+    },
+    "ground-blue-ice.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground albedo texture, one full-bleed square tile, requested 2048 x 2048 pixels, opaque 8-bit sRGB PNG.\nStyle: quiet painterly and natural, soft fine material detail, restrained contrast and believable muted colour. Not neon, not cartoon, not photographic. Strictly orthographic straight down. This must tile seamlessly in BOTH axes with matching opposite edges. The entire square is covered with terrain, no border. No singular landmark or strong direction. Individual features smaller than a few percent of tile width; only gentle large-scale value variation. It will paint flat ground AND low hill faces and be sampled at two scales.\nFLAT UNLIT ALBEDO: no directional shading, cast shadows, specular highlights, reflections, sun glitter, glow, gradient lighting, vignette, horizon, sky, perspective, text, labels, legend or watermark. Colour differences indicate material only. The renderer supplies all lighting.\nSubject: bare glacial ice on an AIRLESS frozen world. Glassy pale blue to blue-grey material colour, distinctly blue rather than snowy white, with a fine network of short irregular fractures in varied directions. Some fractures filled with white frost. Faint trapped tiny bubbles and soft cloudy inclusions, a few tiny dark grit specks. Small random ice fracture cells and subtle ice veining distributed evenly, no one large crack or feature. NO snow, no wind ripples, no sastrugi, no snowdrifts, no ridges of accumulated snow. Even though the material is ice, absolutely no reflected sky, shiny glints, lighting streaks or specular sheen. Subdued blue mineral ice albedo, broad colour nearly even.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a17e4b-f86a-7690-91b4-ddf5676c503e/exec-f63cbd9e-59e4-42eb-997c-038cddd7de0d.png",
+      "raw": "raw/ground-blue-ice.png",
+      "file": "images/ground-blue-ice.png",
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "processing": {
+        "resample": "Lanczos3 to 2048 x 2048; no native 2K detail claimed",
+        "seams": "Pairwise opposing-edge mean with smoothstep feather over 82 pixels (4%), horizontally then vertically",
+        "output": "Opaque 8-bit RGB PNG with sRGB ICC profile"
+      },
+      "audit": {
+        "nativeSize": [
+          1254,
+          1254
+        ],
+        "finalSize": [
+          2048,
+          2048
+        ],
+        "alpha": false,
+        "channels": 3,
+        "colourspace": "srgb",
+        "bitDepth": 8,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "webp512Quality78EstimateBytes": 60596,
+        "bytes": 9329658,
+        "sha256": "2dc1e9c0ee42c6d42765c829549bfd60325806ec3d1717479376d40fff265a54"
+      },
+      "sourceManifest": "prompts-ice-hardpan.json",
+      "styleReferencesReviewed": [
+        "output/body-assets-v5/images/ground-desert.png",
+        "output/body-assets-v5/images/ground-snow.png",
+        "output/body-assets-v5/images/moon-icy.png",
+        "output/body-assets-v5/images/planet-arid.png"
+      ],
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "74": 48870,
+          "76": 51550,
+          "78": 57220
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 51550
+      },
+      "sha256": "2dc1e9c0ee42c6d42765c829549bfd60325806ec3d1717479376d40fff265a54"
+    },
+    "ground-ice-lineae.png": {
+      "prompt": "Use case: precise-object-edit.\nAsset type: seamless square game ground albedo texture, full bleed, opaque PNG, requested 2048 x 2048.\nInput image 1 is the EDIT TARGET: cream and tan icy-moon crust with thin rust-red lineae. Input image 2 is ONLY A BRIGHTNESS COMPARISON: blue glacial ice. Return only an edited version of image 1, no collage, no side-by-side, no blue ice in the output.\nPrimary change: the target is too bright. Change ONLY its broad material colour/value to subdued, dirty warm-grey and grey-tan midtones. Its average brightness must now be visibly LOWER than the blue-ice comparison image. Aim an average sRGB material value near RGB 118, 112, 101, with quiet mineral variation, a restrained warm-grey/tan look. It must still read as dirty mineral-rich ice, not brown soil or black mud. Keep hints of cream in tiny inclusions, but remove the broad bright ivory/white ground. Do not darken via cast shadows or lighting; these are inherent albedo colours.\nPreserve the target's exact composition, crack topology, feature positions, scale and full-square crop: thin reddish-brown arcs, paired narrow lineae, fine granular material, tiny sparse craterlets and the small jumbled ice patches. Keep the rust lines narrow and their contrast restrained. Do not add objects or larger features. Keep the overall flat, quiet painterly style, strict straight-down orthographic view, fine features and gentle non-directional variation. No new shading, highlights, reflections, glow, gradients, vignette, horizon, sky, text, symbols, frame or watermark. Both opposing edges must continue seamlessly. All geometry remains from image 1; image 2 only defines the maximum average brightness to stay below.",
+      "source": "/Users/mat/.codex/generated_images/01a17e4b-f86a-7690-91b4-ddf5676c503e/exec-4bdbdfc0-0552-4937-a018-c486174482a8.png",
+      "reference": "/Users/mat/Documents/dev/3-body/output/body-assets-v6/raw/ground-ice-lineae-edit-input.png",
+      "references": [
+        {
+          "path": "/Users/mat/Documents/dev/3-body/output/body-assets-v6/raw/ground-ice-lineae-edit-input.png",
+          "role": "edit target; archived previous finished lineae image"
+        },
+        {
+          "path": "/Users/mat/Documents/dev/3-body/output/body-assets-v6/images/ground-blue-ice.png",
+          "role": "brightness comparison only"
+        }
+      ],
+      "seed": null,
+      "raw": "raw/ground-ice-lineae.png",
+      "file": "images/ground-ice-lineae.png",
+      "editHistory": [
+        {
+          "prompt": "Use case: stylized-concept.\nAsset type: production game ground albedo texture, one full-bleed square tile, requested 2048 x 2048 pixels, opaque 8-bit sRGB PNG.\nStyle: quiet painterly and natural, soft fine material detail, restrained contrast and believable muted colour. Not neon, not cartoon, not photographic. Strictly orthographic straight down. This must tile seamlessly in BOTH axes with matching opposite edges. The entire square is covered with terrain, no border. No singular landmark or strong direction. Individual features smaller than a few percent of tile width; only gentle large-scale value variation. It will paint flat ground AND low hill faces and be sampled at two scales.\nFLAT UNLIT ALBEDO: no directional shading, cast shadows, specular highlights, reflections, sun glitter, glow, gradient lighting, vignette, horizon, sky, perspective, text, labels, legend or watermark. Colour differences indicate material only. The renderer supplies all lighting.\nSubject: a close-up of an icy moon crust. Cream, off-white and faint tan ice, slightly dirty and darker in value than a clean pale-blue glacial ice tile. Many very thin reddish-brown crack lines (lineae), with a few paired narrow lines suggesting doubled ridges, wandering short arcs in varied directions. Red-brown lines occupy only 2–4 percent of the area; delicate narrow marks, no large red seams. A few small clusters of jumbled ice fragments (chaos terrain), and very few tiny worn craterlets, no feature bigger than a few percent of tile. Thin cracks are painted pigment lines with NO raised shaded relief. Subtle cream/tan granular ice material fills every pixel. No snow, water, wind-carved drifts, blue glints or dark directional shadows.",
+          "reference": null,
+          "seed": null,
+          "source": "/Users/mat/.codex/generated_images/01a17e4b-f86a-7690-91b4-ddf5676c503e/exec-11fce100-7ae0-4eb2-852d-e17537094ae7.png",
+          "raw": "raw/ground-ice-lineae-v1.png",
+          "file": "raw/ground-ice-lineae-edit-input.png",
+          "nativeSize": [
+            1254,
+            1254
+          ],
+          "finalSize": [
+            2048,
+            2048
+          ],
+          "processing": {
+            "resample": "Lanczos3 to 2048 x 2048; no native 2K detail claimed",
+            "seams": "Pairwise opposing-edge mean with smoothstep feather over 82 pixels (4%), horizontally then vertically",
+            "output": "Opaque 8-bit RGB PNG with sRGB ICC profile"
+          },
+          "audit": {
+            "nativeSize": [
+              1254,
+              1254
+            ],
+            "finalSize": [
+              2048,
+              2048
+            ],
+            "alpha": false,
+            "channels": 3,
+            "colourspace": "srgb",
+            "bitDepth": 8,
+            "embeddedSrgbProfile": true,
+            "maxOppositeEdgeDelta": {
+              "horizontal": 0,
+              "vertical": 0
+            },
+            "webp512Quality78EstimateBytes": 53038,
+            "bytes": 8798815,
+            "sha256": "da797bfd65ec37d6b8e690ac2e1ff20df7483834e841dbc3d3ce1c134cf4db00"
+          },
+          "status": "Superseded after review: broad ivory ground brighter than blue ice. One targeted built-in imagegen colour/value edit preserves crack topology and changes broad ground to subdued warm grey/tan."
+        }
+      ],
+      "notes": "Colour/value change performed by built-in imagegen, not deterministic colour processing. Finishing only resizes and matches edges.",
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "processing": {
+        "resample": "Lanczos3 to 2048 x 2048; no native 2K detail claimed",
+        "seams": "Pairwise opposing-edge mean with smoothstep feather over 82 pixels (4%), horizontally then vertically",
+        "output": "Opaque 8-bit RGB PNG with sRGB ICC profile"
+      },
+      "audit": {
+        "nativeSize": [
+          1254,
+          1254
+        ],
+        "finalSize": [
+          2048,
+          2048
+        ],
+        "alpha": false,
+        "channels": 3,
+        "colourspace": "srgb",
+        "bitDepth": 8,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "webp512Quality78EstimateBytes": 55218,
+        "bytes": 8497181,
+        "sha256": "8ff3539699b0fda5aeea205d3961743cfd7ef235172582b61abd195637002c41"
+      },
+      "sourceManifest": "prompts-ice-hardpan.json",
+      "styleReferencesReviewed": [
+        "output/body-assets-v5/images/ground-desert.png",
+        "output/body-assets-v5/images/ground-snow.png",
+        "output/body-assets-v5/images/moon-icy.png",
+        "output/body-assets-v5/images/planet-arid.png"
+      ],
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "74": 43960,
+          "76": 46754,
+          "78": 52064
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 46754
+      },
+      "sha256": "8ff3539699b0fda5aeea205d3961743cfd7ef235172582b61abd195637002c41"
+    },
+    "ground-hardpan.png": {
+      "prompt": "Use case: stylized-concept.\nAsset type: production game ground albedo texture, one full-bleed square tile, requested 2048 x 2048 pixels, opaque 8-bit sRGB PNG.\nStyle: quiet painterly and natural, soft fine material detail, restrained contrast and believable muted colour. Not neon, not cartoon, not photographic. Strictly orthographic straight down. This must tile seamlessly in BOTH axes with matching opposite edges. The entire square is covered with terrain, no border. No singular landmark or strong direction. Individual features smaller than a few percent of tile width; only gentle large-scale value variation. It will paint flat ground AND low hill faces and be sampled at two scales.\nFLAT UNLIT ALBEDO: no directional shading, cast shadows, specular highlights, reflections, sun glitter, glow, gradient lighting, vignette, horizon, sky, perspective, text, labels, legend or watermark. Colour differences indicate material only. The renderer supplies all lighting.\nSubject: a stony arid-world desert pavement, clearly distinct from loose sand. Rust-red and muted ochre compact hardpan densely packed with tiny dark grey-brown wind-polished pebbles, shallow cracked clay polygons, a few tiny pale cream salt-crust patches, and thin dry gravel rills wandering without a dominant direction. No pebbles or polygons bigger than a few percent of tile. Subdued weathered iron-rich terracotta with ochre undertones and fine small darker gravel, not strongly orange. Pebble shapes are diffuse material-colour patches, with NO directional shadows or shiny polished highlights. NO dunes, no sand waves, no vegetation, no plants, no frost, no heat shimmer.",
+      "reference": null,
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a17e4b-f86a-7690-91b4-ddf5676c503e/exec-8d7bfe92-146f-468e-8bdc-fbbc07fc1dd8.png",
+      "raw": "raw/ground-hardpan.png",
+      "file": "images/ground-hardpan.png",
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "processing": {
+        "resample": "Lanczos3 to 2048 x 2048; no native 2K detail claimed",
+        "seams": "Pairwise opposing-edge mean with smoothstep feather over 82 pixels (4%), horizontally then vertically",
+        "output": "Opaque 8-bit RGB PNG with sRGB ICC profile"
+      },
+      "audit": {
+        "nativeSize": [
+          1254,
+          1254
+        ],
+        "finalSize": [
+          2048,
+          2048
+        ],
+        "alpha": false,
+        "channels": 3,
+        "colourspace": "srgb",
+        "bitDepth": 8,
+        "embeddedSrgbProfile": true,
+        "maxOppositeEdgeDelta": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "webp512Quality78EstimateBytes": 85832,
+        "bytes": 10950947,
+        "sha256": "accaa4716d98e1238af673533562087fae35a8b362ad67292adc339cdbf80c0d",
+        "webp512Quality76EstimateBytes": 79710,
+        "compressionNote": "Quality 76 meets the approximate 80 KB shipping budget without changing the PNG master. No shipping WebP is written."
+      },
+      "sourceManifest": "prompts-ice-hardpan.json",
+      "styleReferencesReviewed": [
+        "output/body-assets-v5/images/ground-desert.png",
+        "output/body-assets-v5/images/ground-snow.png",
+        "output/body-assets-v5/images/moon-icy.png",
+        "output/body-assets-v5/images/planet-arid.png"
+      ],
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "74": 74328,
+          "76": 77952,
+          "78": 84660
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 77952
+      },
+      "sha256": "accaa4716d98e1238af673533562087fae35a8b362ad67292adc339cdbf80c0d"
+    },
+    "ground-lava.png": {
+      "prompt": "Use case: precise-object-edit.\nAsset type: square seamless production ground ALBEDO texture. Supplied image is the edit target.\nRefine only these problems: Narrow the open red-orange channels and enlarge neutral charcoal crust locally until the total open lava fraction is about25% (current is37%). Break the largest crust rafts into smaller ropy charcoal pieces so no single raft is a landmark. Keep the irregular evenly distributed all-over fissure network and ropy material, not a giant river.\nMake ALL lava channels and pools dark muted red-orange/brown, approximately RGB70,30,20; eliminate brighter orange highlights and luminous-looking streaks entirely. The albedo is flat unlit colour; a separate shader supplies emission. Keep crust neutral charcoal without red oxidation so a clean emission mask can be extracted. Preserve quiet painterly texture, gently soft fine detail, uniform illumination, full-bleed square and tileability both directions.\nNo glow, bloom, flames, smoke, perspective, horizon, sunlight, shadows, sheen, glossy reflection, text, labels, frame or vignette. Request opaque8bit sRGB2048x2048PNG.",
+      "reference": "raw/ground-lava-candidate-01.png",
+      "seed": null,
+      "source": "/Users/mat/.codex/generated_images/01a17e4c-366d-7080-903a-e8772d41f1f0/exec-aa7da526-e95b-4c04-9cd1-99adc614c108.png",
+      "initialGeneration": {
+        "prompt": "Use case: stylized-concept.\nAsset type: production game ground ALBEDO texture, one square seamless tile, requested 2048 x 2048 pixels, opaque 8-bit sRGB PNG.\nPrimary request: Active lava ground with many SMALL rafts and plates of thin black-and-charcoal crust, each only 1–3 percent of the tile width, with soft ropy wrinkles in varied directions. Wider interconnecting open lava channels and seams separate the crust plates, with occasional small rounded lava pools. Open lava covers roughly 25 percent of the tile, visibly more than faint cracks in cooled scorched basalt.\nColour separation: crust is neutral dark charcoal (roughly RGB32–55, similar channels), while ALL open lava material is dark muted orange-brown or dull red (roughly RGB80,35,25). The lava material is painted dark, with NO luminous centre. Do not put reddish oxidation on the crust: reddish pigment belongs only to the open channels, seams and pools. This allows an exact separate emission mask to be derived later.\nStyle: quiet, painterly, natural and restrained, soft fine detail, not photographic, not neon or cartoonish. Full-bleed square. Strictly orthographic straight down, flat UNLIT diffuse albedo. Uniform material colour, no dramatic relief.\nSeamless in both directions: left edge matches right edge, top matches bottom. Small random distributed features, no central landmark, no huge plates, no dominant flow direction, gentle overall value variation so repeats remain unobtrusive. Terrain must also look plausible on the side of low hills.\nAbsolutely no glow, bloom, highlights, shiny reflections, cast shadows, sun, sky, perspective, horizon, vignette, flames, smoke, text, labels, legend, border or watermark. No orange/yellow/white hot light; emission will be supplied by a separate mask. Fill every pixel with ground.",
+        "reference": null,
+        "source": "/Users/mat/.codex/generated_images/01a17e4c-366d-7080-903a-e8772d41f1f0/exec-af1bce8e-cc61-480f-83b3-2f24839292b3.png",
+        "raw": "raw/ground-lava-candidate-01.png"
+      },
+      "raw": "raw/ground-lava.png",
+      "styleReferencesReviewed": [
+        "output/body-assets-v5/images/ground-scorched.png",
+        "output/body-assets-v5/images/planet-lava.png"
+      ],
+      "nativeSize": [
+        1254,
+        1254
+      ],
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "file": "images/ground-lava.png",
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "space": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "icc": true,
+        "maxOppositeEdgeDifference": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 101,
+        "sha256": "f103169ad0c5c32ebc4da4a9e56309b2e4701095b8741e485e32f68c906a9da3",
+        "estimated512WebpQuality78Bytes": 52946
+      },
+      "processing": {
+        "resample": "Native1254x1254 resampled to2048x2048 using Lanczos3; no native2048detail claimed",
+        "seams": "Cubic smoothstep equal pair-mean feather over82pixels(4%) from each opposite edge, horizontal thenvertical",
+        "output": "8bitopaqueRGBsRGBwithICC"
+      },
+      "sourceManifest": "prompts-lava.json",
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "74": 46662,
+          "76": 48610,
+          "78": 52946
+        },
+        "suggestedQuality": 76,
+        "suggestedBytes": 48610
+      },
+      "sha256": "f103169ad0c5c32ebc4da4a9e56309b2e4701095b8741e485e32f68c906a9da3"
+    },
+    "ground-lava-glow.png": {
+      "prompt": null,
+      "reference": "images/ground-lava.png",
+      "seed": null,
+      "method": "Deterministic derivation from final albedo; no independent generation",
+      "nativeSize": null,
+      "finalSize": [
+        2048,
+        2048
+      ],
+      "file": "images/ground-lava-glow.png",
+      "audit": {
+        "size": [
+          2048,
+          2048
+        ],
+        "bitDepth": 8,
+        "space": "srgb",
+        "channels": 3,
+        "alpha": false,
+        "icc": true,
+        "maxOppositeEdgeDifference": {
+          "horizontal": 0,
+          "vertical": 0
+        },
+        "maxRGBChannelDelta": 0,
+        "sha256": "ebbb0475800753a997c340fda087ba4aa82f4bf9ae195a81653bc1a20e57c2b9",
+        "estimated512WebpQuality78Bytes": 36556,
+        "maskWeightedCoverage": 0.2763455007587353,
+        "maskFractionAbove32": 0.38127565383911133,
+        "maskFractionWhite250": 0.12341475486755371,
+        "maskFractionBlack": 0.49602413177490234,
+        "registration": "same-pixel scalar extraction from final albedo, followed by centered periodic tent and Gaussian smoothing and 8-pixel edge reconciliation; no spatial offset or independent redraw"
+      },
+      "processing": {
+        "source": "images/ground-lava.png",
+        "field": "smoothstep(12,32,R-max(G,B))",
+        "softEdge": "Periodic3x3tent convolution with weights[1,2,1]×[1,2,1]/16, then Gaussian sigma4px using16px wrapped padding; about1px at shipped512size; duplicated-edgeperiod2047. Reconcile libvips blur-grid rounding with8px opposite-edge smoothstep feather.",
+        "output": "round(field*255) identically inRGB; no independent image generation or offset"
+      },
+      "notes": "Glow mask derived from finalalbedo after seam finishing. Thin antialiased seams naturally gray; broad channels/pools white; neutralcrust black.",
+      "sourceManifest": "prompts-lava.json",
+      "shippingEstimate": {
+        "qualityToBytes": {
+          "74": 33416,
+          "76": 34442,
+          "78": 36556
+        },
+        "suggestedQuality": 78,
+        "suggestedBytes": 36556
+      },
+      "sha256": "ebbb0475800753a997c340fda087ba4aa82f4bf9ae195a81653bc1a20e57c2b9",
+      "sourceAlbedoPrompt": "Use case: precise-object-edit.\nAsset type: square seamless production ground ALBEDO texture. Supplied image is the edit target.\nRefine only these problems: Narrow the open red-orange channels and enlarge neutral charcoal crust locally until the total open lava fraction is about25% (current is37%). Break the largest crust rafts into smaller ropy charcoal pieces so no single raft is a landmark. Keep the irregular evenly distributed all-over fissure network and ropy material, not a giant river.\nMake ALL lava channels and pools dark muted red-orange/brown, approximately RGB70,30,20; eliminate brighter orange highlights and luminous-looking streaks entirely. The albedo is flat unlit colour; a separate shader supplies emission. Keep crust neutral charcoal without red oxidation so a clean emission mask can be extracted. Preserve quiet painterly texture, gently soft fine detail, uniform illumination, full-bleed square and tileability both directions.\nNo glow, bloom, flames, smoke, perspective, horizon, sunlight, shadows, sheen, glossy reflection, text, labels, frame or vignette. Request opaque8bit sRGB2048x2048PNG.",
+      "promptNote": "This mask was not independently generated. The exact source-albedo prompt is retained in sourceAlbedoPrompt; the deterministic recipe is in processing and finish-lava.mjs."
+    }
+  }
+}

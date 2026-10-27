@@ -449,7 +449,7 @@ export function createSky3D({ canvas, onContextLost, onContextRestored, onTextur
     const daylight = skyDaylight(suns), climate = climates ? (climates.get(b.id) ?? 2) : 2;
     const gas = b.kind === 'planet' && worldRadiusAU(b) > 2 * R_EARTH_AU;   // past the radius valley: deep air and no ground
     const airless = !!a.surface.airless, atmo = airless ? { rgb: [0, 0, 0], strength: 0 } : atmosphereTint(climate);   // no air: a black sky by day
-    surface.view.update({ basis, look: surface.look, suns, worlds, climate, atmo, airless, daylight: airless ? 0 : daylight, gas, surface: a.surface.name, seed: (b.id * 7919 + Math.round(b.m * 1e9)) >>> 0 });
+    surface.view.update({ basis, look: surface.look, suns, worlds, climate, atmo, airless, daylight: airless ? 0 : daylight, gas, moon: !!a.surface.moon, surface: a.surface.name, seed: (b.id * 7919 + Math.round(b.m * 1e9)) >>> 0 });
     surface.view.render();
     surface.info = { id: b.id, suns, worlds, daylight, gas, radiusEarth: worldRadiusAU(b) / R_EARTH_AU };
     return true;

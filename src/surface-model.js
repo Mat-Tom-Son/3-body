@@ -136,3 +136,26 @@ export function phoneLook(alpha, beta, gamma) {
   const x = -sg * ca - cg * sb * sa, y = -sg * sa + cg * sb * ca, z = -cg * cb;   // east, north, up
   return { az: Math.atan2(x, y), alt: Math.asin(clamp(z, -1, 1)) };
 }
+
+/* The ground underfoot: two tiles and how far between them, and the glow mask for the one that can glow. The world's
+ * map from space decides the kind of ground; the climate (0 frozen, 1-3 liveable, 4 burning) walks it toward ice or
+ * scorched rock. f: { surface (the map's name), climate, gas, moon }. */
+const LADDER = ['v5/ground-snow', 'v5/ground-grassland', 'v5/ground-grassland', 'v5/ground-desert', 'v5/ground-scorched'];
+const SCORCHED = 'v5/ground-scorched', LAVA = 'v6/ground-lava';
+export const GLOW_OF = { [SCORCHED]: 'v5/ground-scorched-glow', [LAVA]: 'v6/ground-lava-glow' };
+export function groundTiles(f) {
+  const c = clamp(f.climate, 0, 4), one = t => [t, t, 0];
+  /* a world of its own kind: ice below the liveable range, scorched rock past it */
+  const own = (t, cold = 'v5/ground-snow') => (c < 1 ? [cold, t, c] : c > 3.5 ? [t, SCORCHED, (c - 3.5) * 2] : one(t));
+  if (f.gas) return one('v5/ground-cloudtops');
+  switch (f.surface) {
+    case 'v5/planet-lava': return one(LAVA);
+    case 'v5/planet-barren': case 'moon-surface': return one('v5/ground-regolith');
+    case 'v5/moon-icy': return one(f.moon ? 'v6/ground-ice-lineae' : 'v6/ground-blue-ice');   // airless ice: no wind to shape snow
+    case 'v5/planet-eyeball': return own('v6/ground-ice-margin', 'v6/ground-blue-ice');   // the ring of shore and broken ice round the sunlit sea
+    case 'v5/planet-ocean': return own('v6/ground-shore');
+    case 'v5/planet-arid': return own('v6/ground-hardpan');
+  }
+  const i = Math.min(3, Math.floor(c));
+  return [LADDER[i], LADDER[i + 1], c - i];
+}

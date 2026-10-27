@@ -1,0 +1,85 @@
+{
+  "tool": "sharp 0.35.4",
+  "masters": "sources are relative to the folder holding the asset set (output/, kept outside the repository)",
+  "note": "Resizing and compression of the asset set v6 masters. The masters stay outside the repository; lighting, climate, seams and blending are the renderer's.",
+  "assets": [
+    {
+      "name": "ground-ice-margin",
+      "source": "body-assets-v6/images/ground-ice-margin.png",
+      "sourceSha256": "2eb9235ae7f7d4c588a940d140b0918381845240bd3a73be0d6683dfa3f3ac22",
+      "sourceBytes": 10818294,
+      "file": "public/assets/bodies/v6/ground-ice-margin.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 82924,
+      "sha256": "4bb3f2c18cd9ab6e6601157a156ef7470fc40e24a1839b1c20c6eb5f80bdf967"
+    },
+    {
+      "name": "ground-shore",
+      "source": "body-assets-v6/images/ground-shore.png",
+      "sourceSha256": "fc5ef86d15c3c06773e7c6de240c8a8b6e196a5797ae64d34115d98d90b6c946",
+      "sourceBytes": 11040779,
+      "file": "public/assets/bodies/v6/ground-shore.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 71570,
+      "sha256": "7b6a87cf1e7269bcf450dee92eef01fe6b5c742766d06deb612daf2dd4deef32"
+    },
+    {
+      "name": "ground-blue-ice",
+      "source": "body-assets-v6/images/ground-blue-ice.png",
+      "sourceSha256": "2dc1e9c0ee42c6d42765c829549bfd60325806ec3d1717479376d40fff265a54",
+      "sourceBytes": 9329658,
+      "file": "public/assets/bodies/v6/ground-blue-ice.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 51550,
+      "sha256": "06f972ddc64cea2ec0f6cc8b1d8d9750129fd9fee3d9252532366fa4e6a99c8c"
+    },
+    {
+      "name": "ground-ice-lineae",
+      "source": "body-assets-v6/images/ground-ice-lineae.png",
+      "sourceSha256": "8ff3539699b0fda5aeea205d3961743cfd7ef235172582b61abd195637002c41",
+      "sourceBytes": 8497181,
+      "file": "public/assets/bodies/v6/ground-ice-lineae.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 46754,
+      "sha256": "14a4545242a2db46d9901c4d708bc78dd75b0745ace71e0cc076a0d5131415f3"
+    },
+    {
+      "name": "ground-hardpan",
+      "source": "body-assets-v6/images/ground-hardpan.png",
+      "sourceSha256": "accaa4716d98e1238af673533562087fae35a8b362ad67292adc339cdbf80c0d",
+      "sourceBytes": 10950947,
+      "file": "public/assets/bodies/v6/ground-hardpan.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 77952,
+      "sha256": "1ea45fcfe322f857e56b17157313b644abea45920527379d5cfcb1ddcff97250"
+    },
+    {
+      "name": "ground-lava",
+      "source": "body-assets-v6/images/ground-lava.png",
+      "sourceSha256": "f103169ad0c5c32ebc4da4a9e56309b2e4701095b8741e485e32f68c906a9da3",
+      "sourceBytes": 8091881,
+      "file": "public/assets/bodies/v6/ground-lava.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 48610,
+      "sha256": "7b051b18f1975e9171a29e3af8203bdf696a01725176a801b7cd2caa14ba062d"
+    },
+    {
+      "name": "ground-lava-glow",
+      "source": "body-assets-v6/images/ground-lava-glow.png",
+      "sourceSha256": "ebbb0475800753a997c340fda087ba4aa82f4bf9ae195a81653bc1a20e57c2b9",
+      "sourceBytes": 2048014,
+      "file": "public/assets/bodies/v6/ground-lava-glow.webp",
+      "width": 512,
+      "height": 512,
+      "sizeBytes": 36556,
+      "sha256": "1327742695e2a2896659e3ceccf3d1d68246abe566510107ee15c3324c040432"
+    }
+  ],
+  "totalBytes": 415916
+}
